@@ -2,6 +2,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn.utils import run_simulator
 from alu import *
+from utils import run_quietly
 
 Instructions = [
     # 基本算术运算
@@ -110,8 +111,8 @@ def test_alu():
         driver = Driver()
         driver.build()
 
-    sim, _ = elaborate(sys, sim_threshold=len(Instructions))
+    sim, _ = elaborate(sys, verbose=False, sim_threshold=len(Instructions))
 
-    raw = run_simulator(sim)
-    print(raw)
+    raw, stdout, stderr = run_quietly(run_simulator, sim)
+    assert raw is not None, stderr
     check(raw)

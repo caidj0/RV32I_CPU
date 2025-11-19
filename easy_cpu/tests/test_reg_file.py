@@ -3,6 +3,7 @@ from assassyn.backend import elaborate
 from assassyn.utils import run_simulator
 
 from reg_file import RegFile, RegOccupation
+from utils import run_quietly
 
 # 测试指令: (rd, rd_data)
 Instructions = [
@@ -104,10 +105,10 @@ def test_reg_file():
         rd, rd_data = driver.build(reg_file)
         reg_file.build(rd, rd_data)
 
-    sim, _ = elaborate(sys, sim_threshold=len(Instructions) + 1)
+    sim, _ = elaborate(sys, verbose=False, sim_threshold=len(Instructions) + 1)
 
-    raw = run_simulator(sim)
-    print(raw)
+    raw, stdout, stderr = run_quietly(run_simulator, sim)
+    assert raw is not None, stderr
     check(raw)
 
 
