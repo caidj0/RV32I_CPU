@@ -17,7 +17,7 @@ def pop_or(port: Port, default_value: Value) -> Value:
 
 def run_quietly(func: Callable[[Any], Any], *args, **kwargs) -> tuple[Any | None, str, str]:
     """Runs a function while capturing all output."""
-    """Copied from assassyn."""
+    """Original version from assassyn."""
     stdout = io.StringIO()
     stderr = io.StringIO()
     result = None
