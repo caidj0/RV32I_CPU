@@ -80,8 +80,8 @@ def run_quietly(func: Callable[[Any], Any], *args, **kwargs) -> tuple[Any | None
 
 
 class RecodeWrapper(ABC):
-    def bind_with(self, receiver: Module | Bind):
+    def bind_with(self, receiver: Module | Bind, skips: list[str] = []):
         for name, v in self.__dict__.items():
-            if not isinstance(v, ValueWrapper):
+            if name in skips or not isinstance(v, ValueWrapper):
                 continue
             v.bind_with((receiver, name))

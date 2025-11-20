@@ -1,7 +1,8 @@
-from alu import RV32I_ALU, BitsALU, alu
+from alu import ALU_LEN, RV32I_ALU, BITS_ALU, alu
 from assassyn.frontend import *
 from assassyn.ir.dtype import RecordValue
 from instruction import MO_LEN, OF_LEN, WBF_LEN, OperantFrom
+from reg_file import RegFile
 from utils import Bool, forward_ports, peek_or, to_one_hot
 
 
@@ -29,7 +30,7 @@ class Executor(Module):
                 "rs1": Port(Bits(5)),
                 "rs2": Port(Bits(5)),
                 "imm": Port(Bits(32)),
-                "alu_op": Port(BitsALU),
+                "alu_op": Port(BITS_ALU),
                 "operant1_from": Port(Bits(OF_LEN)),
                 "operant2_from": Port(Bits(OF_LEN)),
                 "memory_operation": Port(Bits(MO_LEN)),
@@ -51,8 +52,8 @@ class Executor(Module):
             operant1_from = self.operant1_from.pop()
             operant2_from = self.operant2_from.pop()
 
-            rs1 = peek_or(self.rs1, Bits(5)(0))
-            rs2 = peek_or(self.rs2, Bits(5)(0))
+            rs1 = peek_or(self.rs1, Bits(32)(0))
+            rs2 = peek_or(self.rs2, Bits(32)(0))
             imm = peek_or(self.imm, Bits(32)(0))
 
             one_hot_operant1_from = to_one_hot(operant1_from, len(OperantFrom))
@@ -60,7 +61,7 @@ class Executor(Module):
             operants = [rs1, rs2, imm, instruction_addr]
             operant1 = one_hot_operant1_from.select1hot(operants)
             operant2 = one_hot_operant2_from.select1hot(operants)
-            alu_result = alu(to_one_hot(alu_op, len(RV32I_ALU)), operant1, operant2)
+            alu_result = alu(to_one_hot(alu_op, ALU_LEN), operant1, operant2)
 
             memory.bind(alu_result=alu_result)
 

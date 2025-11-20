@@ -87,7 +87,7 @@ class Driver(Module):
         self.operant1_data = RegArray(Bits(32), len(Instructions), [x[0] for x in Instructions])
         self.operant2_data = RegArray(Bits(32), len(Instructions), [x[1] for x in Instructions])
         self.op_data = RegArray(
-            BitsALU,
+            BITS_ALU,
             len(Instructions),
             [1 << x[2].value for x in Instructions],
         )

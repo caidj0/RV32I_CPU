@@ -25,11 +25,13 @@ class Decoder(Module):
 
         with Condition(args.rs1.valid):
             wait_until(reg_occupation[args.rs1.value] == Bits(2)(0))
+            executor.bind(rs1=reg_file.regs[args.rs1.value])
 
         with Condition(args.rs2.valid):
             wait_until(reg_occupation[args.rs2.value] == Bits(2)(0))
+            executor.bind(rs2=reg_file.regs[args.rs2.value])
 
-        args.bind_with(executor)
+        args.bind_with(executor, ["rs1", "rs2"])
         executor.async_called(instruction_addr=instruction_addr)
 
         success_decode |= Bool(1)

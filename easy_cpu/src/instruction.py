@@ -1,6 +1,6 @@
 from math import ceil, log2
 from pickletools import OpcodeInfo
-from alu import RV32I_ALU, BitsALU
+from alu import RV32I_ALU, BITS_ALU
 from assassyn.frontend import Value, Bits, Record
 
 from dataclasses import asdict, dataclass
@@ -11,8 +11,14 @@ from utils import Bool, RecodeWrapper, ValueWrapper
 
 
 class MemoryOperation(Enum):
-    LOAD = 0
-    STORE = 1
+    LOAD_BYTE = 0
+    LOAD_HALF = 1
+    LOAD_WORD = 2
+    LOAD_BYTEU = 3
+    LOAD_HALFU = 4
+    STORE_BYTE = 5
+    STORE_HALF = 6
+    STORE_WORD = 7
 
 
 MO_LEN = ceil(log2(len(MemoryOperation)))
@@ -63,7 +69,7 @@ def default_instruction_arguments() -> InstructionArgs:
         rs1=ValueWrapper(Bits(5), False),
         rs2=ValueWrapper(Bits(5), False),
         imm=ValueWrapper(Bits(32), False),
-        alu_op=ValueWrapper(BitsALU, False),
+        alu_op=ValueWrapper(BITS_ALU, False),
         operant1_from=ValueWrapper(Bits(OF_LEN), False),
         operant2_from=ValueWrapper(Bits(OF_LEN), False),
         memory_operation=ValueWrapper(Bits(MO_LEN), False),
@@ -107,7 +113,7 @@ class Instruction:
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
 
         if self.alu_info is not None:
-            args.alu_op.set(BitsALU(self.alu_info.alu_op.value))
+            args.alu_op.set(BITS_ALU(self.alu_info.alu_op.value))
             args.operant1_from.set(Bits(3)(self.alu_info.operant1_from.value))
             args.operant2_from.set(Bits(3)(self.alu_info.operant2_from.value))
 
@@ -144,7 +150,7 @@ class RTypeInstruction(Instruction):
 
 
 class ITypeInstruction(Instruction):
-    is_load: bool
+    memory_operation: None | MemoryOperation
 
     def __init__(
         self,
@@ -153,7 +159,7 @@ class ITypeInstruction(Instruction):
         funct3: int,
         funct7: None | int = None,
         change_PC: bool = False,
-        is_load: bool = False,
+        memory_operation: None | MemoryOperation = None,
         write_back_from: None | WriteBackFrom = WriteBackFrom.ALU,
     ):
         def imm_fn(instruction: Value) -> Value:
@@ -171,17 +177,19 @@ class ITypeInstruction(Instruction):
             change_PC=change_PC,
             write_back_from=write_back_from,
         )
-        self.is_load = is_load
+        self.memory_operation = memory_operation
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().set_args(instruction, args)
-        if self.is_load:
-            args.memory_operation.set(Bits(1)(MemoryOperation.LOAD.value))
+        if self.memory_operation is not None:
+            args.memory_operation.set(Bits(MO_LEN)(self.memory_operation.value))
         return args
 
 
 class STypeInstruction(Instruction):
-    def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int):
+    memory_operation: MemoryOperation
+
+    def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int, memory_operation: MemoryOperation):
         def imm_fn(instruction: Value) -> Value:
             imm_0_4 = instruction[7:11]
             imm_5_11 = instruction[25:31]
@@ -199,10 +207,11 @@ class STypeInstruction(Instruction):
             change_PC=False,
             write_back_from=None,
         )
+        self.memory_operation = memory_operation
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().set_args(instruction, args)
-        args.memory_operation.set(Bits(1)(MemoryOperation.STORE.value))
+        args.memory_operation.set(Bits(MO_LEN)(self.memory_operation.value))
         return args
 
 
@@ -305,24 +314,50 @@ class Instructions(Enum):
     SLTIU = ITypeInstruction(opcode=0b0010011, alu_op=RV32I_ALU.SLTU, funct3=0x3)
 
     LB = ITypeInstruction(
-        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x0, is_load=True, write_back_from=WriteBackFrom.MEM
+        opcode=0b0000011,
+        alu_op=RV32I_ALU.ADD,
+        funct3=0x0,
+        memory_operation=MemoryOperation.LOAD_BYTE,
+        write_back_from=WriteBackFrom.MEM,
     )
     LH = ITypeInstruction(
-        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x1, is_load=True, write_back_from=WriteBackFrom.MEM
+        opcode=0b0000011,
+        alu_op=RV32I_ALU.ADD,
+        funct3=0x1,
+        memory_operation=MemoryOperation.LOAD_HALF,
+        write_back_from=WriteBackFrom.MEM,
     )
     LW = ITypeInstruction(
-        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x2, is_load=True, write_back_from=WriteBackFrom.MEM
+        opcode=0b0000011,
+        alu_op=RV32I_ALU.ADD,
+        funct3=0x2,
+        memory_operation=MemoryOperation.LOAD_WORD,
+        write_back_from=WriteBackFrom.MEM,
     )
     LBU = ITypeInstruction(
-        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x4, is_load=True, write_back_from=WriteBackFrom.MEM
+        opcode=0b0000011,
+        alu_op=RV32I_ALU.ADD,
+        funct3=0x4,
+        memory_operation=MemoryOperation.LOAD_BYTE,
+        write_back_from=WriteBackFrom.MEM,
     )
     LHU = ITypeInstruction(
-        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x5, is_load=True, write_back_from=WriteBackFrom.MEM
+        opcode=0b0000011,
+        alu_op=RV32I_ALU.ADD,
+        funct3=0x5,
+        memory_operation=MemoryOperation.LOAD_HALFU,
+        write_back_from=WriteBackFrom.MEM,
     )
 
-    SB = STypeInstruction(opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x0)
-    SH = STypeInstruction(opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x1)
-    SW = STypeInstruction(opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x2)
+    SB = STypeInstruction(
+        opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x0, memory_operation=MemoryOperation.STORE_BYTE
+    )
+    SH = STypeInstruction(
+        opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x1, memory_operation=MemoryOperation.STORE_HALF
+    )
+    SW = STypeInstruction(
+        opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x2, memory_operation=MemoryOperation.STORE_WORD
+    )
 
     # alu 结果非零跳转，全零不跳转
     BNE = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SUB, funct3=0x1)

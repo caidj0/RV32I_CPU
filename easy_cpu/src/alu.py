@@ -17,13 +17,14 @@ class RV32I_ALU(Enum):
     AND = 9
 
 
-BitsALU = Bits(ceil(log2(len(RV32I_ALU))))
+ALU_LEN = len(RV32I_ALU)
+BITS_ALU = Bits(ceil(log2(ALU_LEN)))
 
 
 def alu(op: Value, operant1: Value, operant2: Value):
     shifter = operant2[0:4]
 
-    values = [Bits(32)(0)] * len(RV32I_ALU)
+    values = [Bits(32)(0)] * ALU_LEN
     values[RV32I_ALU.ADD.value] = operant1 + operant2
     values[RV32I_ALU.SUB.value] = operant1 - operant2
     values[RV32I_ALU.SLL.value] = operant1 << shifter
