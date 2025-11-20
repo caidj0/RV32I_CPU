@@ -1,4 +1,5 @@
 from enum import Enum
+from math import ceil, log2
 from assassyn.frontend import *
 from assassyn.ir.expr import Bind
 
@@ -16,7 +17,7 @@ class RV32I_ALU(Enum):
     AND = 9
 
 
-BitsALU = Bits(len(RV32I_ALU))
+BitsALU = Bits(ceil(log2(len(RV32I_ALU))))
 
 
 def alu(op: Value, operant1: Value, operant2: Value):

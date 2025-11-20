@@ -1,52 +1,84 @@
+from math import ceil, log2
+from pickletools import OpcodeInfo
 from alu import RV32I_ALU, BitsALU
 from assassyn.frontend import Value, Bits, Record
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Callable
 
-from utils import Bool
+from utils import Bool, RecodeWrapper, ValueWrapper
+
+
+class MemoryOperation(Enum):
+    LOAD = 0
+    STORE = 1
+
+
+MO_LEN = ceil(log2(len(MemoryOperation)))
+
+
+class OperantFrom(Enum):
+    RS1 = 0
+    RS2 = 1
+    IMM = 2
+    PC = 3
+
+
+OF_LEN = ceil(log2(len(OperantFrom)))
+
+
+class WriteBackFrom(Enum):
+    ALU = 0
+    MEM = 1
+    INC_PC = 2
+    IMM = 3
+
+
+WBF_LEN = ceil(log2(len(WriteBackFrom)))
 
 
 @dataclass
-class InstructionArgs:
-    rd: Value
-    rs1: Value
-    rs1_valid: Value
-    rs2: Value
-    rs2_valid: Value
-    imm: Value
-    imm_valid: Value
-    alu_op: Value
-    memory_operation: Value
+class InstructionArgs(RecodeWrapper):
+    rd: ValueWrapper
+    rs1: ValueWrapper
+    rs2: ValueWrapper
+    imm: ValueWrapper
 
-    is_branch: Value
-    branch_flip: Value
+    alu_op: ValueWrapper
+    operant1_from: ValueWrapper
+    operant2_from: ValueWrapper
 
-    change_PC: Value
+    memory_operation: ValueWrapper
+    is_branch: ValueWrapper
+    branch_flip: ValueWrapper
+    change_PC: ValueWrapper
+
+    write_back_from: ValueWrapper
 
 
 def default_instruction_arguments() -> InstructionArgs:
     return InstructionArgs(
-        rd=Bits(32)(0),
-        rs1=Bits(5)(0),
-        rs1_valid=Bool(0),
-        rs2=Bits(5)(0),
-        rs2_valid=Bool(0),
-        imm=Bits(32)(0),
-        imm_valid=Bool(0),
-        alu_op=BitsALU(0),
-        memory_operation=Bits(2)(0),
-        is_branch=Bool(0),
-        branch_flip=Bool(0),
-        change_PC=Bool(0),
+        rd=ValueWrapper(Bits(5), False),
+        rs1=ValueWrapper(Bits(5), False),
+        rs2=ValueWrapper(Bits(5), False),
+        imm=ValueWrapper(Bits(32), False),
+        alu_op=ValueWrapper(BitsALU, False),
+        operant1_from=ValueWrapper(Bits(OF_LEN), False),
+        operant2_from=ValueWrapper(Bits(OF_LEN), False),
+        memory_operation=ValueWrapper(Bits(MO_LEN), False),
+        is_branch=ValueWrapper(Bool, True),
+        branch_flip=ValueWrapper(Bool, True),
+        change_PC=ValueWrapper(Bool, True),
+        write_back_from=ValueWrapper(Bits(WBF_LEN), False),
     )
 
 
-class MemoryOperation(Enum):
-    NONE = 0
-    LOAD = 1
-    STORE = 2
+@dataclass
+class ALUInfo:
+    alu_op: RV32I_ALU
+    operant1_from: OperantFrom
+    operant2_from: OperantFrom
 
 
 @dataclass
@@ -55,13 +87,16 @@ class Instruction:
     funct3: None | int
     funct7: None | int
 
-    alu_op: RV32I_ALU
+    alu_info: None | ALUInfo
+
     has_rd: bool
     has_rs1: bool
     has_rs2: bool
     imm: None | Callable[[Value], Value]
 
     change_PC: bool
+
+    write_back_from: None | WriteBackFrom
 
     def matches(self, instruction: Value) -> Value:
         op_match = instruction[0:6] == Bits(7)(self.opcode)
@@ -70,17 +105,24 @@ class Instruction:
         return op_match & funct3_match & funct7_match
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
-        args.alu_op |= self.alu_op
+
+        if self.alu_info is not None:
+            args.alu_op.set(BitsALU(self.alu_info.alu_op.value))
+            args.operant1_from.set(Bits(3)(self.alu_info.operant1_from.value))
+            args.operant2_from.set(Bits(3)(self.alu_info.operant2_from.value))
+
         if self.has_rd:
-            args.rd |= instruction[7:11]
+            args.rd.set(instruction[7:11])
         if self.has_rs1:
-            args.rs1 |= instruction[15:19]
+            args.rs1.set(instruction[15:19])
         if self.has_rs2:
-            args.rs2 |= instruction[20:24]
+            args.rs2.set(instruction[20:24])
         if self.imm is not None:
-            args.imm |= self.imm(instruction)
+            args.imm.set(self.imm(instruction))
         if self.change_PC:
-            args.change_PC |= Bool(1)
+            args.change_PC.set(Bool(1))
+        if self.write_back_from is not None:
+            args.write_back_from.set(Bits(WBF_LEN)(self.write_back_from.value))
 
         return args
 
@@ -89,7 +131,7 @@ class RTypeInstruction(Instruction):
     def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int, funct7: int):
         super().__init__(
             opcode=opcode,
-            alu_op=alu_op,
+            alu_info=ALUInfo(alu_op, OperantFrom.RS1, OperantFrom.RS2),
             funct3=funct3,
             funct7=funct7,
             has_rd=True,
@@ -97,6 +139,7 @@ class RTypeInstruction(Instruction):
             has_rs2=True,
             imm=None,
             change_PC=False,
+            write_back_from=WriteBackFrom.ALU,
         )
 
 
@@ -106,18 +149,19 @@ class ITypeInstruction(Instruction):
     def __init__(
         self,
         opcode: int,
-        alu_op: RV32I_ALU,
+        alu_op: None | RV32I_ALU,
         funct3: int,
         funct7: None | int = None,
         change_PC: bool = False,
         is_load: bool = False,
+        write_back_from: None | WriteBackFrom = WriteBackFrom.ALU,
     ):
         def imm_fn(instruction: Value) -> Value:
             return instruction[20:31].sext(Bits(32))
 
         super().__init__(
             opcode=opcode,
-            alu_op=alu_op,
+            alu_info=ALUInfo(alu_op, OperantFrom.RS1, OperantFrom.IMM) if alu_op is not None else None,
             funct3=funct3,
             funct7=funct7,
             has_rd=True,
@@ -125,13 +169,14 @@ class ITypeInstruction(Instruction):
             has_rs2=False,
             imm=imm_fn,
             change_PC=change_PC,
+            write_back_from=write_back_from,
         )
         self.is_load = is_load
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().set_args(instruction, args)
         if self.is_load:
-            args.memory_operation |= Bits(2)(MemoryOperation.LOAD.value)
+            args.memory_operation.set(Bits(1)(MemoryOperation.LOAD.value))
         return args
 
 
@@ -144,7 +189,7 @@ class STypeInstruction(Instruction):
 
         super().__init__(
             opcode=opcode,
-            alu_op=alu_op,
+            alu_info=ALUInfo(alu_op, OperantFrom.RS1, OperantFrom.IMM),
             funct3=funct3,
             funct7=None,
             has_rd=False,
@@ -152,11 +197,12 @@ class STypeInstruction(Instruction):
             has_rs2=True,
             imm=imm_fn,
             change_PC=False,
+            write_back_from=None,
         )
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().set_args(instruction, args)
-        args.memory_operation |= Bits(2)(MemoryOperation.STORE.value)
+        args.memory_operation.set(Bits(1)(MemoryOperation.STORE.value))
         return args
 
 
@@ -173,7 +219,7 @@ class BTypeInstruction(Instruction):
 
         super().__init__(
             opcode=opcode,
-            alu_op=alu_op,
+            alu_info=ALUInfo(alu_op, OperantFrom.RS1, OperantFrom.RS2),
             funct3=funct3,
             funct7=None,
             has_rd=False,
@@ -181,26 +227,27 @@ class BTypeInstruction(Instruction):
             has_rs2=True,
             imm=imm_fn,
             change_PC=True,
+            write_back_from=None,
         )
         self.branch_flip = branch_flip
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().set_args(instruction, args)
         if self.branch_flip:
-            args.branch_flip |= Bool(1)
-        args.is_branch |= Bool(1)
+            args.branch_flip.set(Bool(1))
+        args.is_branch.set(Bool(1))
 
         return args
 
 
 class UTypeInstruction(Instruction):
-    def __init__(self, opcode: int, alu_op: RV32I_ALU):
+    def __init__(self, opcode: int, alu_op: RV32I_ALU, write_back_from: WriteBackFrom):
         def imm_fn(instruction: Value) -> Value:
             return Bits(12)(0).concat(instruction[12:31])
 
         super().__init__(
             opcode=opcode,
-            alu_op=alu_op,
+            alu_info=ALUInfo(alu_op, OperantFrom.PC, OperantFrom.IMM),
             funct3=None,
             funct7=None,
             has_rd=True,
@@ -208,6 +255,7 @@ class UTypeInstruction(Instruction):
             has_rs2=False,
             imm=imm_fn,
             change_PC=False,
+            write_back_from=write_back_from,
         )
 
 
@@ -222,7 +270,7 @@ class JTypeInstruction(Instruction):
 
         super().__init__(
             opcode=opcode,
-            alu_op=alu_op,
+            alu_info=ALUInfo(alu_op, OperantFrom.PC, OperantFrom.IMM),
             funct3=None,
             funct7=None,
             has_rd=True,
@@ -230,6 +278,7 @@ class JTypeInstruction(Instruction):
             has_rs2=False,
             imm=imm_fn,
             change_PC=True,
+            write_back_from=WriteBackFrom.INC_PC,
         )
 
 
@@ -255,11 +304,21 @@ class Instructions(Enum):
     SLTI = ITypeInstruction(opcode=0b0010011, alu_op=RV32I_ALU.SLT, funct3=0x2)
     SLTIU = ITypeInstruction(opcode=0b0010011, alu_op=RV32I_ALU.SLTU, funct3=0x3)
 
-    LB = ITypeInstruction(opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x0, is_load=True)
-    LH = ITypeInstruction(opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x1, is_load=True)
-    LW = ITypeInstruction(opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x2, is_load=True)
-    LBU = ITypeInstruction(opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x4, is_load=True)
-    LHU = ITypeInstruction(opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x5, is_load=True)
+    LB = ITypeInstruction(
+        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x0, is_load=True, write_back_from=WriteBackFrom.MEM
+    )
+    LH = ITypeInstruction(
+        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x1, is_load=True, write_back_from=WriteBackFrom.MEM
+    )
+    LW = ITypeInstruction(
+        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x2, is_load=True, write_back_from=WriteBackFrom.MEM
+    )
+    LBU = ITypeInstruction(
+        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x4, is_load=True, write_back_from=WriteBackFrom.MEM
+    )
+    LHU = ITypeInstruction(
+        opcode=0b0000011, alu_op=RV32I_ALU.ADD, funct3=0x5, is_load=True, write_back_from=WriteBackFrom.MEM
+    )
 
     SB = STypeInstruction(opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x0)
     SH = STypeInstruction(opcode=0b0100011, alu_op=RV32I_ALU.ADD, funct3=0x1)
@@ -276,9 +335,11 @@ class Instructions(Enum):
     BGEU = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SLTU, funct3=0x7, branch_flip=True)
 
     JAL = JTypeInstruction(opcode=0b1101111, alu_op=RV32I_ALU.ADD)
-    JALR = ITypeInstruction(opcode=0b1100111, funct3=0x0, alu_op=RV32I_ALU.ADD, change_PC=True)
+    JALR = ITypeInstruction(
+        opcode=0b1100111, funct3=0x0, alu_op=RV32I_ALU.ADD, change_PC=True, write_back_from=WriteBackFrom.INC_PC
+    )
 
-    LUI = UTypeInstruction(opcode=0b0110111, alu_op=RV32I_ALU.ADD)
-    AUIPC = UTypeInstruction(opcode=0b0010111, alu_op=RV32I_ALU.ADD)
+    LUI = UTypeInstruction(opcode=0b0110111, alu_op=RV32I_ALU.ADD, write_back_from=WriteBackFrom.IMM)
+    AUIPC = UTypeInstruction(opcode=0b0010111, alu_op=RV32I_ALU.ADD, write_back_from=WriteBackFrom.ALU)
 
-    EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD)
+    EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD, write_back_from=None)

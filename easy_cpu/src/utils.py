@@ -1,10 +1,31 @@
+from abc import ABC
 import contextlib
+from dataclasses import dataclass
 import io
 import os
-from typing import Callable, Any
+from typing import Callable, Any, Self
 from assassyn.frontend import *
+from assassyn.ir.expr.call import Bind
 
 Bool = Bits(1)
+
+
+class ValueWrapper:
+    value: Value
+    valid: Value
+
+    def __init__(self, dtype: Callable[[Any], Value], default_valid: bool, initializer: Any = 0):
+        self.value = dtype(initializer)
+        self.valid = Bool(int(default_valid))
+
+    def bind_with(self, bound: tuple[Module | Bind, str]):
+        with Condition(self.valid):
+            receiver, name = bound
+            receiver.bind(**{name: self.value})
+
+    def set(self, value: Value):
+        self.value |= value
+        self.valid |= Bool(1)
 
 
 def pop_or(port: Port, default_value: Value) -> Value:
@@ -13,6 +34,23 @@ def pop_or(port: Port, default_value: Value) -> Value:
     with Condition(valid):
         port.pop()
     return value
+
+
+def peek_or(port: Port, default_value: Value) -> Value:
+    valid = port.valid()
+    value = valid.select(port.peek(), default_value)
+    return value
+
+
+def forward_ports(receiver: Module | Bind, ports: list[Port]):
+    for port in ports:
+        name = port.name
+        with Condition(port.valid()):
+            receiver.bind(**{name: port.pop()})
+
+
+def to_one_hot(value: Value, select_number: int) -> Value:
+    return Bits(select_number)(1) << value
 
 
 def run_quietly(func: Callable[[Any], Any], *args, **kwargs) -> tuple[Any | None, str, str]:
@@ -39,3 +77,11 @@ def run_quietly(func: Callable[[Any], Any], *args, **kwargs) -> tuple[Any | None
             stderr.write(f"Error: {str(e)}\n")
 
     return result, stdout.getvalue(), stderr.getvalue()
+
+
+class RecodeWrapper(ABC):
+    def bind_with(self, receiver: Module | Bind):
+        for name, v in self.__dict__.items():
+            if not isinstance(v, ValueWrapper):
+                continue
+            v.bind_with((receiver, name))
