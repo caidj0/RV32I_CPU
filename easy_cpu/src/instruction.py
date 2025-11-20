@@ -235,7 +235,7 @@ class BTypeInstruction(Instruction):
             has_rs1=True,
             has_rs2=True,
             imm=imm_fn,
-            change_PC=True,
+            change_PC=False,
             write_back_from=None,
         )
         self.branch_flip = branch_flip

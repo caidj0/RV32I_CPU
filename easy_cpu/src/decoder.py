@@ -36,4 +36,4 @@ class Decoder(Module):
 
         success_decode |= Bool(1)
 
-        return success_decode
+        return success_decode, args.rd.value
