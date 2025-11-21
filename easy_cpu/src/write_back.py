@@ -72,10 +72,8 @@ class WriteBack(Module):
         reg_file.build(rd, data)
 
         branch_success = is_branch & ((alu_result != Bits(32)(0)) ^ branch_flip)
-        with Condition(branch_success):
+        with Condition(branch_success | change_PC):
             flush_PC = alu_result & alu_result
-        with Condition(change_PC):
-            PC_adder = imm & imm
 
         log_parts = []
         for i in range(32):
@@ -83,4 +81,4 @@ class WriteBack(Module):
         log_format = " ".join(log_parts)
         log(log_format, *[reg_file.regs[i] for i in range(32)])
 
-        return flush_PC, PC_adder, rd
+        return flush_PC, rd

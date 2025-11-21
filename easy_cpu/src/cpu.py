@@ -27,7 +27,7 @@ class CPU:
 
     def __init__(self, sram_file: str | None):
         self.reg_file = RegFile()
-        self.icache = SRAM(32, 1<<8, sram_file)
+        self.icache = SRAM(32, 0x100000, sram_file)
         self.dcache = SRAM(32, 0x100000, sram_file)
 
         self.fetcher = Fetcher()
@@ -51,9 +51,7 @@ class CPU:
         )
         self.executor.build(self.memory)
         self.memory.build(self.dcache, self.write_back)
-        flush_PC, PC_adder, release_rd = self.write_back.build(self.reg_file, self.dcache)
+        flush_PC, release_rd = self.write_back.build(self.reg_file, self.dcache)
 
-        self.fetcher_impl.build(
-            PC_reg, PC_addr, success_decode, should_stall, flush_PC, PC_adder, self.decoder, self.icache
-        )
+        self.fetcher_impl.build(PC_reg, PC_addr, success_decode, should_stall, flush_PC, self.decoder, self.icache)
         self.reg_occupation.build(occupied_rd, release_rd)
