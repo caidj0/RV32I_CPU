@@ -27,8 +27,8 @@ class Executor(Module):
             ports={
                 "instruction_addr": Port(Bits(32)),
                 "rd": Port(Bits(5)),
-                "rs1": Port(Bits(5)),
-                "rs2": Port(Bits(5)),
+                "rs1": Port(Bits(32)),
+                "rs2": Port(Bits(32)),
                 "imm": Port(Bits(32)),
                 "alu_op": Port(BITS_ALU),
                 "operant1_from": Port(Bits(OF_LEN)),
@@ -59,8 +59,8 @@ class Executor(Module):
             one_hot_operant1_from = to_one_hot(operant1_from, len(OperantFrom))
             one_hot_operant2_from = to_one_hot(operant2_from, len(OperantFrom))
             operants = [rs1, rs2, imm, instruction_addr]
-            operant1 = one_hot_operant1_from.select1hot(operants)
-            operant2 = one_hot_operant2_from.select1hot(operants)
+            operant1 = one_hot_operant1_from.select1hot(*operants)
+            operant2 = one_hot_operant2_from.select1hot(*operants)
             alu_result = alu(to_one_hot(alu_op, ALU_LEN), operant1, operant2)
 
             memory.bind(alu_result=alu_result)

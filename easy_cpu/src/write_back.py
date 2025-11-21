@@ -64,10 +64,10 @@ class WriteBack(Module):
             load_halfu = dout_half.zext(Bits(32))
 
             load = to_one_hot(memory_operation, MO_LEN).select1hot(
-                [load_byte, load_half, load_word, load_byteu, load_halfu, Bits(32)(0), Bits(32)(0), Bits(32)(0)]
+                *[load_byte, load_half, load_word, load_byteu, load_halfu, Bits(32)(0), Bits(32)(0), Bits(32)(0)]
             )
 
-            data = to_one_hot(write_back_from, 4).select1hot([alu_result, load, instruction_addr + Bits(32)(4), imm])
+            data = to_one_hot(write_back_from, 4).select1hot(*[alu_result, load, instruction_addr + Bits(32)(4), imm])
 
         reg_file.build(rd, data)
 

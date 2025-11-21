@@ -17,10 +17,10 @@ class Fetcher(Module):
 
 class FetcherImpl(Downstream):
     stalled: Array
-    pushed: Array
 
     def __init__(self):
         super().__init__()
+        self.stalled = RegArray(Bool, 1)
 
     # 设计接口时需要小心：如果它的上游均没有运行（即均触发了 wait_until），则下游根本不会运行
     @downstream.combinational

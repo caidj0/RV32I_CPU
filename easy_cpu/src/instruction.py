@@ -112,25 +112,25 @@ class Instruction:
         funct7_match = Bool(1) if self.funct7 is None else instruction[25:31] == Bits(7)(self.funct7)
         return op_match & funct3_match & funct7_match
 
-    def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
+    def select_args(self, cond: Value, instruction: Value, args: InstructionArgs) -> InstructionArgs:
 
         if self.alu_info is not None:
-            args.alu_op.set(BITS_ALU(self.alu_info.alu_op.value))
-            args.operant1_from.set(Bits(3)(self.alu_info.operant1_from.value))
-            args.operant2_from.set(Bits(3)(self.alu_info.operant2_from.value))
+            args.alu_op.select(cond, BITS_ALU(self.alu_info.alu_op.value))
+            args.operant1_from.select(cond, Bits(OF_LEN)(self.alu_info.operant1_from.value))
+            args.operant2_from.select(cond, Bits(OF_LEN)(self.alu_info.operant2_from.value))
 
         if self.has_rd:
-            args.rd.set(instruction[7:11])
+            args.rd.select(cond, instruction[7:11])
         if self.has_rs1:
-            args.rs1.set(instruction[15:19])
+            args.rs1.select(cond, instruction[15:19])
         if self.has_rs2:
-            args.rs2.set(instruction[20:24])
+            args.rs2.select(cond, instruction[20:24])
         if self.imm is not None:
-            args.imm.set(self.imm(instruction))
+            args.imm.select(cond, self.imm(instruction))
         if self.change_PC:
-            args.change_PC.set(Bool(1))
+            args.change_PC.select(cond, Bool(1))
         if self.write_back_from is not None:
-            args.write_back_from.set(Bits(WBF_LEN)(self.write_back_from.value))
+            args.write_back_from.select(cond, Bits(WBF_LEN)(self.write_back_from.value))
 
         return args
 
@@ -184,12 +184,12 @@ class ITypeInstruction(Instruction):
         self.memory_operation = memory_operation
         self.just_stall = just_stall
 
-    def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
-        args = super().set_args(instruction, args)
+    def select_args(self, cond: Value, instruction: Value, args: InstructionArgs) -> InstructionArgs:
+        args = super().select_args(cond, instruction, args)
         if self.memory_operation is not None:
-            args.memory_operation.set(Bits(MO_LEN)(self.memory_operation.value))
+            args.memory_operation.select(cond, Bits(MO_LEN)(self.memory_operation.value))
         if self.just_stall:
-            args.just_stall.set(Bool(1))
+            args.just_stall.select(cond, Bool(1))
         return args
 
 
@@ -216,9 +216,9 @@ class STypeInstruction(Instruction):
         )
         self.memory_operation = memory_operation
 
-    def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
-        args = super().set_args(instruction, args)
-        args.memory_operation.set(Bits(MO_LEN)(self.memory_operation.value))
+    def select_args(self, cond: Value, instruction: Value, args: InstructionArgs) -> InstructionArgs:
+        args = super().select_args(cond, instruction, args)
+        args.memory_operation.select(cond, Bits(MO_LEN)(self.memory_operation.value))
         return args
 
 
@@ -227,10 +227,10 @@ class BTypeInstruction(Instruction):
 
     def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int, branch_flip: bool = False):
         def imm_fn(instruction: Value) -> Value:
-            imm_11 = instruction[7]
+            imm_11 = instruction[7:7]
             imm_1_4 = instruction[8:11]
             imm_5_10 = instruction[25:30]
-            imm_12 = instruction[31]
+            imm_12 = instruction[31:31]
             return Bool(0).concat(imm_1_4).concat(imm_5_10).concat(imm_11).concat(imm_12).sext(Bits(32))
 
         super().__init__(
@@ -247,11 +247,11 @@ class BTypeInstruction(Instruction):
         )
         self.branch_flip = branch_flip
 
-    def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
-        args = super().set_args(instruction, args)
+    def select_args(self, cond: Value, instruction: Value, args: InstructionArgs) -> InstructionArgs:
+        args = super().select_args(cond, instruction, args)
         if self.branch_flip:
-            args.branch_flip.set(Bool(1))
-        args.is_branch.set(Bool(1))
+            args.branch_flip.select(cond, Bool(1))
+        args.is_branch.select(cond, Bool(1))
 
         return args
 
@@ -279,9 +279,9 @@ class JTypeInstruction(Instruction):
     def __init__(self, opcode: int, alu_op: RV32I_ALU):
         def imm_fn(instruction: Value) -> Value:
             imm_1_10 = instruction[21:30]
-            imm_11 = instruction[20]
+            imm_11 = instruction[20:20]
             imm_12_19 = instruction[12:19]
-            imm_20 = instruction[31]
+            imm_20 = instruction[31:31]
             return Bool(0).concat(imm_1_10).concat(imm_11).concat(imm_12_19).concat(imm_20).sext(Bits(32))
 
         super().__init__(

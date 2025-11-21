@@ -23,9 +23,9 @@ class ValueWrapper:
             receiver, name = bound
             receiver.bind(**{name: self.value})
 
-    def set(self, value: Value):
-        self.value |= value
-        self.valid |= Bool(1)
+    def select(self, cond: Value, value: Value):
+        self.value = cond.select(value, self.value)
+        self.valid = cond.select(Bool(1), self.valid)
 
 
 def pop_or(port: Port, default_value: Value) -> Value:

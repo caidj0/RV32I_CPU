@@ -33,15 +33,14 @@ class CPU:
         self.executor = Executor()
         self.memory = Memory()
         self.write_back = WriteBack()
+        self.reg_occupation = RegOccupation()
 
         self._connect()
 
     def _connect(self):
-        instruction = self.icache.dout[0]
-
         PC = self.fetcher.build()
         success_decode, occupied_rd, should_stall = self.decoder.build(
-            instruction, self.reg_file, self.reg_occupation, self.executor
+            self.icache, self.reg_file, self.reg_occupation, self.executor
         )
         self.executor.build(self.memory)
         self.memory.build(self.dcache, self.write_back)

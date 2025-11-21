@@ -37,24 +37,23 @@ class Memory(Module):
     @module.combinational
     def build(self, dcache: SRAM, write_back: Module):
         need_mem = self.memory_operation.valid()
-        we = Bool(0)
-        re = Bool(0)
-        addr = Bits(32)(0)
-        wdata = Bits(32)(0)
 
-        with Condition(need_mem):
-            memory_operation = self.memory_operation.peek()
-            alu_result = self.alu_result.peek()
-            addr |= alu_result
-            wdata |= peek_or(self.rs2, Bits(32)(0))
+        memory_operation = peek_or(self.memory_operation, Bits(MO_LEN)(0))
+        alu_result = self.alu_result.peek()
+        addr = need_mem.select(alu_result, Bits(32)(0))
+        raw_wdata = peek_or(self.rs2, Bits(32)(0))
 
-            re |= memory_operation <= Bits(MO_LEN)(MemoryOperation.LOAD_HALFU.value)
-            we |= ~re
+        raw_re = memory_operation <= Bits(MO_LEN)(MemoryOperation.LOAD_HALFU.value)
+        re = need_mem & raw_re
+        we = need_mem & (~raw_re)
 
-            with Condition(memory_operation == Bits(MO_LEN)(MemoryOperation.STORE_BYTE.value)):
-                wdata &= Bits(32)(0xFF)
-            with Condition(memory_operation == Bits(MO_LEN)(MemoryOperation.STORE_HALF.value)):
-                wdata &= Bits(32)(0xFFFF)
+        wdata = memory_operation.case(
+            {
+                None: raw_wdata,  # pyright: ignore[reportArgumentType]
+                Bits(MO_LEN)(MemoryOperation.STORE_BYTE.value): raw_wdata & Bits(32)(0xFF),
+                Bits(MO_LEN)(MemoryOperation.STORE_HALF.value): raw_wdata & Bits(32)(0xFFFF),
+            }
+        )
 
         dcache.build(we, re, addr, wdata)
 

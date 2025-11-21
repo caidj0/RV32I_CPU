@@ -24,13 +24,9 @@ class RegOccupation(Downstream):
                     self.occupies[index][0] -= UInt(2)(1)
 
     def __getitem__(self, index: Value) -> Value:
-        is_occupied = Bool(0)
-
-        for i in range(0, 32):
-            with Condition(index == Bits(5)(i)):
-                is_occupied |= (self.occupies[i][0] != UInt(2)(0))
-
-        return is_occupied
+        d = {Bits(5)(i): self.occupies[i][0] for i in range(0, 32)}
+        d[None] = self.occupies[0][0]
+        return index.case(d)  # pyright: ignore[reportArgumentType]
 
 
 class RegFile(Downstream):
