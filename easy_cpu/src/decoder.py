@@ -17,8 +17,14 @@ class Decoder(Module):
 
         args = default_instruction_arguments()
 
+        matched = Bool(0)
+
         for inst in Instructions:
-            inst.value.select_args(inst.value.matches(instruction), instruction, args)
+            inst_cond = inst.value.matches(instruction)
+            inst.value.select_args(inst_cond, instruction, args)
+            matched |= inst_cond
+
+        # assume(matched)
 
         # 常量不能检查 valid，因此需要一个 operator
         success_decode = Bool(0) | Bool(1)
@@ -35,4 +41,13 @@ class Decoder(Module):
         executor.async_called(instruction_addr=instruction_addr)
 
         should_stall = args.is_branch.value | args.change_PC.value | args.just_stall.value
+
+        log(
+            "Decode addr : 0x{:08X}, instruction: 0x{:08X}, imm: 0x{:08X}, should_stall: {}",
+            instruction_addr,
+            instruction,
+            args.imm.value,
+            should_stall,
+        )
+
         return success_decode, args.rd.value, should_stall

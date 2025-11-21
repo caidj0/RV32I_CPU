@@ -77,4 +77,10 @@ class WriteBack(Module):
         with Condition(change_PC):
             PC_adder = imm & imm
 
+        log_parts = []
+        for i in range(32):
+            log_parts.append(f"x{i}={{:08X}}")
+        log_format = " ".join(log_parts)
+        log(log_format, *[reg_file.regs[i] for i in range(32)])
+
         return flush_PC, PC_adder, rd
