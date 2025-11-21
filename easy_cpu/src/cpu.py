@@ -22,10 +22,10 @@ class CPU:
     memory: Memory
     write_back: WriteBack
 
-    def __init__(self, icache_file):
+    def __init__(self, sram_file: str | None):
         self.reg_file = RegFile()
-        self.icache = SRAM(32, 32, icache_file)
-        self.dcache = SRAM(32, 32, None)
+        self.icache = SRAM(32, 32, sram_file)
+        self.dcache = SRAM(32, 32, sram_file)
 
         self.fetcher = Fetcher()
         self.fetcher_impl = FetcherImpl()

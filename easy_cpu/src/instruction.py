@@ -59,6 +59,7 @@ class InstructionArgs(RecodeWrapper):
     is_branch: ValueWrapper
     branch_flip: ValueWrapper
     change_PC: ValueWrapper
+    just_stall: ValueWrapper
 
     write_back_from: ValueWrapper
 
@@ -76,6 +77,7 @@ def default_instruction_arguments() -> InstructionArgs:
         is_branch=ValueWrapper(Bool, True),
         branch_flip=ValueWrapper(Bool, True),
         change_PC=ValueWrapper(Bool, True),
+        just_stall=ValueWrapper(Bool, True),
         write_back_from=ValueWrapper(Bits(WBF_LEN), False),
     )
 
@@ -151,6 +153,7 @@ class RTypeInstruction(Instruction):
 
 class ITypeInstruction(Instruction):
     memory_operation: None | MemoryOperation
+    just_stall: bool
 
     def __init__(
         self,
@@ -161,6 +164,7 @@ class ITypeInstruction(Instruction):
         change_PC: bool = False,
         memory_operation: None | MemoryOperation = None,
         write_back_from: None | WriteBackFrom = WriteBackFrom.ALU,
+        just_stall: bool = False,
     ):
         def imm_fn(instruction: Value) -> Value:
             return instruction[20:31].sext(Bits(32))
@@ -178,11 +182,14 @@ class ITypeInstruction(Instruction):
             write_back_from=write_back_from,
         )
         self.memory_operation = memory_operation
+        self.just_stall = just_stall
 
     def set_args(self, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().set_args(instruction, args)
         if self.memory_operation is not None:
             args.memory_operation.set(Bits(MO_LEN)(self.memory_operation.value))
+        if self.just_stall:
+            args.just_stall.set(Bool(1))
         return args
 
 
@@ -377,4 +384,4 @@ class Instructions(Enum):
     LUI = UTypeInstruction(opcode=0b0110111, alu_op=RV32I_ALU.ADD, write_back_from=WriteBackFrom.IMM)
     AUIPC = UTypeInstruction(opcode=0b0010111, alu_op=RV32I_ALU.ADD, write_back_from=WriteBackFrom.ALU)
 
-    EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD, write_back_from=None)
+    EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD, write_back_from=None, just_stall=True)

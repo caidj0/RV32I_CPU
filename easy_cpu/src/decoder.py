@@ -36,5 +36,5 @@ class Decoder(Module):
 
         success_decode |= Bool(1)
 
-        should_stall = args.is_branch.value | args.change_PC.value
+        should_stall = args.is_branch.value | args.change_PC.value | args.just_stall
         return success_decode, args.rd.value, should_stall
