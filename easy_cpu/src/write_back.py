@@ -35,7 +35,7 @@ class WriteBack(Module):
         )
 
     @module.combinational
-    def build(self, reg_file: RegFile, reg_occupation: RegOccupation, dcache: SRAM):
+    def build(self, reg_file: RegFile, dcache: SRAM):
         need_write_back = self.rd.valid()
 
         instruction_addr = pop_or(self.instruction_addr, Bits(32)(0))
