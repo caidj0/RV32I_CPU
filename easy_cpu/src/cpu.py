@@ -1,4 +1,5 @@
 from assassyn.frontend import *
+from clocker import Driver
 from decoder import Decoder
 from executor import Executor
 from memory import Memory
@@ -22,6 +23,8 @@ class CPU:
     memory: Memory
     write_back: WriteBack
 
+    clocker: Driver
+
     def __init__(self, sram_file: str | None):
         self.reg_file = RegFile()
         self.icache = SRAM(32, 32, sram_file)
@@ -35,9 +38,13 @@ class CPU:
         self.write_back = WriteBack()
         self.reg_occupation = RegOccupation()
 
-        self._connect()
+        self.clocker = Driver()
 
-    def _connect(self):
+        self._build()
+
+    def _build(self):
+        self.clocker.build([self.fetcher, self.decoder])
+
         PC = self.fetcher.build()
         success_decode, occupied_rd, should_stall = self.decoder.build(
             self.icache, self.reg_file, self.reg_occupation, self.executor
