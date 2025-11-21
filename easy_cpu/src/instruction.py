@@ -198,9 +198,9 @@ class STypeInstruction(Instruction):
 
     def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int, memory_operation: MemoryOperation):
         def imm_fn(instruction: Value) -> Value:
-            imm_0_4 = instruction[7:11]
-            imm_5_11 = instruction[25:31]
-            return (imm_0_4.concat(imm_5_11)).sext(Bits(32))
+            imm_4_0 = instruction[7:11]
+            imm_11_5 = instruction[25:31]
+            return imm_11_5.concat(imm_4_0).sext(Bits(32))
 
         super().__init__(
             opcode=opcode,
@@ -228,10 +228,10 @@ class BTypeInstruction(Instruction):
     def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int, branch_flip: bool = False):
         def imm_fn(instruction: Value) -> Value:
             imm_11 = instruction[7:7]
-            imm_1_4 = instruction[8:11]
-            imm_5_10 = instruction[25:30]
+            imm_4_1 = instruction[8:11]
+            imm_10_5 = instruction[25:30]
             imm_12 = instruction[31:31]
-            return Bool(0).concat(imm_1_4).concat(imm_5_10).concat(imm_11).concat(imm_12).sext(Bits(32))
+            return imm_12.concat(imm_11).concat(imm_10_5).concat(imm_4_1).concat(Bits(1)(0)).sext(Bits(32))
 
         super().__init__(
             opcode=opcode,
@@ -259,7 +259,7 @@ class BTypeInstruction(Instruction):
 class UTypeInstruction(Instruction):
     def __init__(self, opcode: int, alu_op: RV32I_ALU, write_back_from: WriteBackFrom):
         def imm_fn(instruction: Value) -> Value:
-            return Bits(12)(0).concat(instruction[12:31])
+            return instruction[12:31].concat(Bits(12)(0))
 
         super().__init__(
             opcode=opcode,
@@ -278,11 +278,11 @@ class UTypeInstruction(Instruction):
 class JTypeInstruction(Instruction):
     def __init__(self, opcode: int, alu_op: RV32I_ALU):
         def imm_fn(instruction: Value) -> Value:
-            imm_1_10 = instruction[21:30]
+            imm_19_12 = instruction[12:19]
             imm_11 = instruction[20:20]
-            imm_12_19 = instruction[12:19]
+            imm_10_1 = instruction[21:30]
             imm_20 = instruction[31:31]
-            return Bool(0).concat(imm_1_10).concat(imm_11).concat(imm_12_19).concat(imm_20).sext(Bits(32))
+            return imm_20.concat(imm_19_12).concat(imm_11).concat(imm_10_1).concat(Bits(1)(0)).sext(Bits(32))
 
         super().__init__(
             opcode=opcode,
