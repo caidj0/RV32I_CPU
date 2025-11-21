@@ -5,10 +5,13 @@ from utils import Bool
 
 
 class Decoder(Module):
+    verbose: bool
+
     instruction_addr: Port
 
-    def __init__(self):
+    def __init__(self, verbose: bool):
         super().__init__(ports={"instruction_addr": Port(Bits(32))})
+        self.verbose = verbose
 
     @module.combinational
     def build(self, icache: SRAM, reg_file: RegFile, reg_occupation: RegOccupation, executor: Module):
@@ -42,12 +45,13 @@ class Decoder(Module):
 
         should_stall = args.is_branch.value | args.change_PC.value | args.just_stall.value
 
-        log(
-            "Decode addr : 0x{:08X}, instruction: 0x{:08X}, imm: 0x{:08X}, should_stall: {}",
-            instruction_addr,
-            instruction,
-            args.imm.value,
-            should_stall,
-        )
+        if self.verbose:
+            log(
+                "Decode addr : 0x{:08X}, instruction: 0x{:08X}, imm: 0x{:08X}, should_stall: {}",
+                instruction_addr,
+                instruction,
+                args.imm.value,
+                should_stall,
+            )
 
         return success_decode, args.rd.value, should_stall

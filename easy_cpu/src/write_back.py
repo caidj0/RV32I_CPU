@@ -1,3 +1,4 @@
+from tabnanny import verbose
 from assassyn.frontend import *
 from instruction import MO_LEN, WBF_LEN, MemoryOperation
 from reg_file import RegFile, RegOccupation
@@ -5,6 +6,8 @@ from utils import Bool, pop_or, to_one_hot
 
 
 class WriteBack(Module):
+    verbose: bool
+
     instruction_addr: Port
     rd: Port
     rs1: Port
@@ -17,7 +20,7 @@ class WriteBack(Module):
     write_back_from: Port
     alu_result: Port
 
-    def __init__(self):
+    def __init__(self, verbose: bool):
         super().__init__(
             ports={
                 "instruction_addr": Port(Bits(32)),
@@ -33,11 +36,10 @@ class WriteBack(Module):
                 "alu_result": Port(Bits(32)),
             }
         )
+        self.verbose = verbose
 
     @module.combinational
     def build(self, reg_file: RegFile, dcache: SRAM):
-        need_write_back = self.rd.valid()
-
         instruction_addr = pop_or(self.instruction_addr, Bits(32)(0))
         rd = pop_or(self.rd, Bits(5)(0))
         _ = pop_or(self.rs1, Bits(32)(0))
@@ -50,24 +52,21 @@ class WriteBack(Module):
         write_back_from = pop_or(self.write_back_from, Bits(WBF_LEN)(0))
         alu_result = pop_or(self.alu_result, Bits(32)(0))
 
-        data = Bits(32)(0)
+        dout: Value = dcache.dout[0]
+        dout_byte = dout[0:7]
+        dout_half = dout[0:15]
 
-        with Condition(need_write_back):
-            dout: Value = dcache.dout[0]
-            dout_byte = dout[0:7]
-            dout_half = dout[0:15]
+        load_byte = dout_byte.sext(Bits(32))
+        load_half = dout_half.sext(Bits(32))
+        load_word = dout
+        load_byteu = dout_byte.zext(Bits(32))
+        load_halfu = dout_half.zext(Bits(32))
 
-            load_byte = dout_byte.sext(Bits(32))
-            load_half = dout_half.sext(Bits(32))
-            load_word = dout
-            load_byteu = dout_byte.zext(Bits(32))
-            load_halfu = dout_half.zext(Bits(32))
+        load = to_one_hot(memory_operation, MO_LEN).select1hot(
+            *[load_byte, load_half, load_word, load_byteu, load_halfu, Bits(32)(0), Bits(32)(0), Bits(32)(0)]
+        )
 
-            load = to_one_hot(memory_operation, MO_LEN).select1hot(
-                *[load_byte, load_half, load_word, load_byteu, load_halfu, Bits(32)(0), Bits(32)(0), Bits(32)(0)]
-            )
-
-            data = to_one_hot(write_back_from, 4).select1hot(*[alu_result, load, instruction_addr + Bits(32)(4), imm])
+        data = to_one_hot(write_back_from, 4).select1hot(*[alu_result, load, instruction_addr + Bits(32)(4), imm])
 
         reg_file.build(rd, data)
 
@@ -75,10 +74,12 @@ class WriteBack(Module):
         with Condition(branch_success | change_PC):
             flush_PC = alu_result & alu_result
 
-        log_parts = []
+        log_parts = ["instruction_addr=0x{:08X}"]
         for i in range(32):
             log_parts.append(f"x{i}={{:08X}}")
         log_format = " ".join(log_parts)
-        log(log_format, *[reg_file.regs[i] for i in range(32)])
+        new_regs = [(rd == Bits(5)(i)).select(data, reg_file.regs[i]) for i in range(32)]
+        new_regs[0] = reg_file.regs[0]
+        log(log_format, instruction_addr, *new_regs)
 
         return flush_PC, rd

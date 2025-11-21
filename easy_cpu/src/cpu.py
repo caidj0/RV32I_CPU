@@ -25,17 +25,17 @@ class CPU:
 
     clocker: Driver
 
-    def __init__(self, sram_file: str | None):
+    def __init__(self, sram_file: str | None, verbose: bool = False):
         self.reg_file = RegFile()
         self.icache = SRAM(32, 0x100000, sram_file)
         self.dcache = SRAM(32, 0x100000, sram_file)
 
         self.fetcher = Fetcher()
-        self.fetcher_impl = FetcherImpl()
-        self.decoder = Decoder()
-        self.executor = Executor()
-        self.memory = Memory()
-        self.write_back = WriteBack()
+        self.fetcher_impl = FetcherImpl(verbose)
+        self.decoder = Decoder(verbose)
+        self.executor = Executor(verbose)
+        self.memory = Memory(verbose)
+        self.write_back = WriteBack(verbose)
         self.reg_occupation = RegOccupation()
 
         self.clocker = Driver()

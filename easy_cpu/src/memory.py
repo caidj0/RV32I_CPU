@@ -5,6 +5,8 @@ from utils import Bool, forward_ports, peek_or
 
 
 class Memory(Module):
+    verbose: bool
+
     instruction_addr: Port
     rd: Port
     rs1: Port
@@ -17,7 +19,7 @@ class Memory(Module):
     write_back_from: Port
     alu_result: Port
 
-    def __init__(self):
+    def __init__(self, verbose: bool):
         super().__init__(
             ports={
                 "instruction_addr": Port(Bits(32)),
@@ -33,6 +35,7 @@ class Memory(Module):
                 "alu_result": Port(Bits(32)),
             }
         )
+        self.verbose = verbose
 
     @module.combinational
     def build(self, dcache: SRAM, write_back: Module):
@@ -55,7 +58,11 @@ class Memory(Module):
             }
         )
 
-        dcache.build(we, re, addr, wdata)
+        # 注意 sram 一个地址对应一个字，从而地址需要截断
+        dcache.build(we, re, addr[2:31].zext(Bits(32)), wdata)
+
+        if self.verbose:
+            log("we: {}, re: {}, addr: 0x{:08X}, wdata: 0x{:08X}", we, re, addr, wdata)
 
         forward_ports(
             write_back,

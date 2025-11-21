@@ -7,6 +7,8 @@ from utils import Bool, forward_ports, peek_or, to_one_hot
 
 
 class Executor(Module):
+    verbose: bool
+
     instruction_addr: Port
 
     rd: Port
@@ -22,7 +24,7 @@ class Executor(Module):
     change_PC: Port
     write_back_from: Port
 
-    def __init__(self):
+    def __init__(self, verbose: bool):
         super().__init__(
             ports={
                 "instruction_addr": Port(Bits(32)),
@@ -40,6 +42,7 @@ class Executor(Module):
                 "write_back_from": Port(Bits(WBF_LEN)),
             }
         )
+        self.verbose = verbose
 
     @module.combinational
     def build(self, memory: Module):
