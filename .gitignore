@@ -1,3 +1,5 @@
 __pycache__
 workspace
 .pytest_cache
+tmp
+out

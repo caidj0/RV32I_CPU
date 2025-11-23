@@ -60,3 +60,6 @@ with open(bin_name, "rb") as bin, open(hex_name, "w") as hex:
             break
         code = int.from_bytes(instruction, byteorder="little")
         hex.write(f"{code:08x}\n")
+
+os.remove(elf_name)
+os.remove(bin_name)

@@ -79,7 +79,7 @@ class WriteBack(Module):
 
         log_parts = ["instruction_addr=0x{:08X}"]
         for i in range(32):
-            log_parts.append(f"x{i}={{:08X}}")
+            log_parts.append(f"x{i}=0x{{:08X}}")
         log_format = " ".join(log_parts)
         new_regs = [(rd == Bits(5)(i)).select(data, reg_file.regs[i]) for i in range(32)]
         new_regs[0] = reg_file.regs[0]
