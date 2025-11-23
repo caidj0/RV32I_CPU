@@ -2,7 +2,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn.utils import run_simulator
 from alu import *
-from utils import run_quietly
+from utils import run_quietly, to_one_hot
 
 Instructions = [
     # 基本算术运算
@@ -89,7 +89,7 @@ class Driver(Module):
         self.op_data = RegArray(
             BITS_ALU,
             len(Instructions),
-            [1 << x[2].value for x in Instructions],
+            [x[2].value for x in Instructions],
         )
 
     @module.combinational
@@ -102,7 +102,7 @@ class Driver(Module):
         new_reg = (new_reg >= UInt(8)(len(Instructions))).select(UInt(8)(0), new_reg)
         self.reg[0] = new_reg
 
-        log("{}", alu(op, operant1, operant2))
+        log("{}", alu(to_one_hot(op, ALU_LEN), operant1, operant2))
 
 
 def test_alu():

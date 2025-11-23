@@ -20,7 +20,7 @@ def test_asms():
     sys = SysBuilder("easy_cpu")
     with sys:
         _ = CPU(work_hex_path, verbose=False)
-    sim, _ = elaborate(sys, verbose=False, sim_threshold=100000, resource_base=os.getcwd())
+    sim, _ = elaborate(sys, verbose=False, sim_threshold=1000000, resource_base=os.getcwd())
 
     test_cases = os.listdir(test_cases_path)
     print(test_cases)
