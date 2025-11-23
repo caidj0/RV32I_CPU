@@ -45,3 +45,4 @@ def test_asms():
         assert ret, f"Can't find result in the last line of output while testing {test_case}"
         ret = int(ret.group(1), 16)
         assert ret == expected_result, f"Test failed for {test_case}: expect result is {expected_result}, get {ret}"
+        print(f"{test_case} passed!")
