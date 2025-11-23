@@ -7,9 +7,14 @@ import subprocess
 parser = argparse.ArgumentParser(description="Compile c file and extract to hex file.")
 parser.add_argument("filename", type=str, help="The path to the input file")
 parser.add_argument("--output", "-o", type=str, help="Specify the output file", required=False)
+parser.add_argument(
+    "--optimize", "-O", type=int, choices=[0, 1, 2, 3], help="Specify the optimization level", required=False, default=3
+)
 args = vars(parser.parse_args())
 
 filename: str = args["filename"]
+optimization_level = args["optimize"]
+
 raw_name, _ = os.path.splitext(os.path.basename(filename))
 dirname = os.path.dirname(filename)
 
@@ -31,7 +36,7 @@ subprocess.check_output(
         "-nostartfiles",
         "-T",
         linker_script_path,
-        "-O3",
+        f"-O{optimization_level}",
         boot_path,
         filename,
         "-o",
