@@ -2,7 +2,7 @@ from tabnanny import verbose
 from assassyn.frontend import *
 from instruction import MO_LEN, WBF_LEN, MemoryOperation
 from reg_file import RegFile, RegOccupation
-from utils import Bool, pop_or, to_one_hot
+from utils import Bool, pop_or, sext, to_one_hot
 
 
 class WriteBack(Module):
@@ -56,8 +56,8 @@ class WriteBack(Module):
         dout_byte = dout[0:7]
         dout_half = dout[0:15]
 
-        load_byte = dout_byte.sext(Bits(32))
-        load_half = dout_half.sext(Bits(32))
+        load_byte = sext(dout_byte, Bits(32))
+        load_half = sext(dout_half, Bits(32))
         load_word = dout
         load_byteu = dout_byte.zext(Bits(32))
         load_halfu = dout_half.zext(Bits(32))

@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Callable
 
-from utils import Bool, RecodeWrapper, ValueWrapper
+from utils import Bool, RecodeWrapper, ValueWrapper, sext
 
 
 class MemoryOperation(Enum):
@@ -167,7 +167,7 @@ class ITypeInstruction(Instruction):
         just_stall: bool = False,
     ):
         def imm_fn(instruction: Value) -> Value:
-            return instruction[20:31].sext(Bits(32))
+            return sext(instruction[20:31], Bits(32))
 
         super().__init__(
             opcode=opcode,
@@ -200,7 +200,7 @@ class STypeInstruction(Instruction):
         def imm_fn(instruction: Value) -> Value:
             imm_4_0 = instruction[7:11]
             imm_11_5 = instruction[25:31]
-            return imm_11_5.concat(imm_4_0).sext(Bits(32))
+            return sext(imm_11_5.concat(imm_4_0), Bits(32))
 
         super().__init__(
             opcode=opcode,
@@ -231,7 +231,7 @@ class BTypeInstruction(Instruction):
             imm_4_1 = instruction[8:11]
             imm_10_5 = instruction[25:30]
             imm_12 = instruction[31:31]
-            return imm_12.concat(imm_11).concat(imm_10_5).concat(imm_4_1).concat(Bits(1)(0)).sext(Bits(32))
+            return sext(imm_12.concat(imm_11).concat(imm_10_5).concat(imm_4_1).concat(Bits(1)(0)), Bits(32))
 
         super().__init__(
             opcode=opcode,
@@ -282,7 +282,7 @@ class JTypeInstruction(Instruction):
             imm_11 = instruction[20:20]
             imm_10_1 = instruction[21:30]
             imm_20 = instruction[31:31]
-            return imm_20.concat(imm_19_12).concat(imm_11).concat(imm_10_1).concat(Bits(1)(0)).sext(Bits(32))
+            return sext(imm_20.concat(imm_19_12).concat(imm_11).concat(imm_10_1).concat(Bits(1)(0)), Bits(32))
 
         super().__init__(
             opcode=opcode,
