@@ -70,8 +70,11 @@ class WriteBack(Module):
 
         reg_file.build(rd, data)
 
-        branch_success = is_branch & ((alu_result != Bits(32)(0)) ^ branch_flip)
-        with Condition(branch_success | change_PC):
+        with Condition(is_branch):
+            branch_success = (alu_result != Bits(32)(0)) ^ branch_flip
+            branch_offset = branch_success.select(imm, Bits(32)(4))
+
+        with Condition(change_PC):
             flush_PC = alu_result & alu_result
 
         log_parts = ["instruction_addr=0x{:08X}"]
@@ -82,4 +85,4 @@ class WriteBack(Module):
         new_regs[0] = reg_file.regs[0]
         log(log_format, instruction_addr, *new_regs)
 
-        return flush_PC, rd
+        return flush_PC, branch_offset, rd

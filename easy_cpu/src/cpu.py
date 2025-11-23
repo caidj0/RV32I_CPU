@@ -51,7 +51,9 @@ class CPU:
         )
         self.executor.build(self.memory)
         self.memory.build(self.dcache, self.write_back)
-        flush_PC, release_rd = self.write_back.build(self.reg_file, self.dcache)
+        flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.dcache)
 
-        self.fetcher_impl.build(PC_reg, PC_addr, success_decode, should_stall, flush_PC, self.decoder, self.icache)
+        self.fetcher_impl.build(
+            PC_reg, PC_addr, success_decode, should_stall, flush_PC, branch_offset, self.decoder, self.icache
+        )
         self.reg_occupation.build(occupied_rd, release_rd)

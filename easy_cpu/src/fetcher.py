@@ -34,19 +34,22 @@ class FetcherImpl(Downstream):
         success_decode: Value,
         should_stall: Value,
         flush_PC: Value,
+        branch_offset: Value,
         decoder: Decoder,
         icache: SRAM,
     ):
         should_stall = should_stall.optional(Bool(0))
         success_decode = success_decode.optional(Bool(0))
 
-        assume(~(flush_PC.valid() & should_stall))
+        cancel_stall = flush_PC.valid() | branch_offset.valid()
 
-        added_PC = PC_addr + Bits(32)(4)
+        assume(~(cancel_stall & should_stall))
 
-        new_stalled = (self.stalled[0] | should_stall) & ~flush_PC.valid()
+        added_PC = PC_addr + branch_offset.optional(Bits(32)(4))
 
-        new_PC = flush_PC.optional((~new_stalled & success_decode).select(added_PC, PC_addr))
+        new_stalled = (self.stalled[0] | should_stall) & ~cancel_stall
+
+        new_PC = flush_PC.optional((branch_offset.valid() | (~new_stalled & success_decode)).select(added_PC, PC_addr))
 
         icache.build(we=Bool(0), re=Bool(1), addr=new_PC[2:31].zext(Bits(32)), wdata=Bits(32)(0))
         PC_reg[0] = new_PC
@@ -54,9 +57,11 @@ class FetcherImpl(Downstream):
 
         if self.verbose:
             log(
-                "flush_PC: ({}, {:08X}), new_PC: {:08X}, new_stalled: {}",
+                "flush_PC: ({}, {:08X}), branch_offset: ({}, {:08X}), new_PC: {:08X}, new_stalled: {}",
                 flush_PC.valid(),
                 flush_PC.optional(Bits(32)(0)),
+                branch_offset.valid(),
+                branch_offset.optional(Bits(32)(0)),
                 new_PC,
                 new_stalled,
             )
