@@ -32,12 +32,15 @@ class Decoder(Module):
         # 常量不能检查 valid，因此需要一个 operator
         success_decode = Bool(0) | Bool(1)
 
+        wait_until(
+            ((~args.rs1.valid) | (reg_occupation[args.rs1.value] == Bits(2)(0)))
+            & ((~args.rs2.valid) | (reg_occupation[args.rs2.value] == Bits(2)(0)))
+        )
+
         with Condition(args.rs1.valid):
-            wait_until(reg_occupation[args.rs1.value] == Bits(2)(0))
             executor.bind(rs1=reg_file.regs[args.rs1.value])
 
         with Condition(args.rs2.valid):
-            wait_until(reg_occupation[args.rs2.value] == Bits(2)(0))
             executor.bind(rs2=reg_file.regs[args.rs2.value])
 
         args.bind_with(executor, ["rs1", "rs2", "just_stall"])
@@ -47,11 +50,17 @@ class Decoder(Module):
 
         if self.verbose:
             log(
-                "Decode addr : 0x{:08X}, instruction: 0x{:08X}, imm: 0x{:08X}, should_stall: {}",
+                "Decode addr : 0x{:08X}, instruction: 0x{:08X}, imm: 0x{:08X}, should_stall: {}, rs1: ({}, {}, 0x{:08X}), rs2: ({}, {}, 0x{:08X})",
                 instruction_addr,
                 instruction,
                 args.imm.value,
                 should_stall,
+                args.rs1.valid,
+                args.rs1.value,
+                reg_file.regs[args.rs1.value],
+                args.rs2.valid,
+                args.rs2.value,
+                reg_file.regs[args.rs2.value],
             )
 
         return success_decode, args.rd.value, should_stall

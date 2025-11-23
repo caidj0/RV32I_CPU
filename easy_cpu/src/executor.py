@@ -68,6 +68,17 @@ class Executor(Module):
 
             memory.bind(alu_result=alu_result)
 
+            if self.verbose:
+                log(
+                    "instruction_addr: 0x{:08X}, operant1: 0x{:08X}, operant2: 0x{:08X}, result: 0x{:08X}, rs1: 0x{:08X}, rs2: 0x{:08X}",
+                    instruction_addr,
+                    operant1,
+                    operant2,
+                    alu_result,
+                    rs1,
+                    rs2,
+                )
+
         forward_ports(
             memory,
             [
