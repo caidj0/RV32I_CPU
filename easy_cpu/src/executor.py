@@ -24,6 +24,8 @@ class Executor(Module):
     change_PC: Port
     write_back_from: Port
 
+    alu_out: Array
+
     def __init__(self, verbose: bool):
         super().__init__(
             ports={
@@ -43,6 +45,7 @@ class Executor(Module):
             }
         )
         self.verbose = verbose
+        self.alu_out = RegArray(Bits(32), 1)
 
     @module.combinational
     def build(self, memory: Module):
@@ -65,6 +68,8 @@ class Executor(Module):
             operant1 = one_hot_operant1_from.select1hot(*operants)
             operant2 = one_hot_operant2_from.select1hot(*operants)
             alu_result = alu(to_one_hot(alu_op, ALU_LEN), operant1, operant2)
+
+            self.alu_out[0] = alu_result
 
             memory.bind(alu_result=alu_result)
 
@@ -96,3 +101,6 @@ class Executor(Module):
         )
 
         memory.async_called()
+
+    def get_out(self) -> Value:
+        return self.alu_out[0]
