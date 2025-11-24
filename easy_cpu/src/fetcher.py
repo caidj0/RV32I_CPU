@@ -45,11 +45,11 @@ class FetcherImpl(Downstream):
 
         assume(~(cancel_stall & should_stall))
 
-        added_PC = PC_addr + branch_offset.optional(Bits(32)(4))
+        added_PC = flush_PC.optional(PC_addr) + branch_offset.optional(Bits(32)(4))
 
         new_stalled = (self.stalled[0] | should_stall) & ~cancel_stall
 
-        new_PC = flush_PC.optional((branch_offset.valid() | (~new_stalled & success_decode)).select(added_PC, PC_addr))
+        new_PC = (cancel_stall | (~new_stalled & success_decode)).select(added_PC, PC_addr)
 
         icache.build(we=Bool(0), re=Bool(1), addr=new_PC[2:31].zext(Bits(32)), wdata=Bits(32)(0))
         PC_reg[0] = new_PC

@@ -1,7 +1,6 @@
 from enum import Enum
 from math import ceil, log2
 from assassyn.frontend import *
-from assassyn.ir.expr import Bind
 
 
 class RV32I_ALU(Enum):

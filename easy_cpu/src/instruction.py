@@ -1,9 +1,8 @@
 from math import ceil, log2
-from pickletools import OpcodeInfo
 from alu import RV32I_ALU, BITS_ALU
-from assassyn.frontend import Value, Bits, Record
+from assassyn.frontend import Value, Bits
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 
@@ -29,17 +28,10 @@ class OperantFrom(Enum):
     RS2 = 1
     IMM = 2
     PC = 3
+    LITERAL_FOUR = 4
 
 
 OF_LEN = ceil(log2(len(OperantFrom)))
-
-
-class WriteBackFrom(Enum):
-    OUT = 0
-    INC_PC = 1
-
-
-WBF_LEN = ceil(log2(len(WriteBackFrom)))
 
 
 @dataclass
@@ -58,8 +50,7 @@ class InstructionArgs(RecodeWrapper):
     branch_flip: ValueWrapper
     change_PC: ValueWrapper
     just_stall: ValueWrapper
-
-    write_back_from: ValueWrapper
+    is_jalr: ValueWrapper
 
 
 def default_instruction_arguments() -> InstructionArgs:
@@ -76,7 +67,7 @@ def default_instruction_arguments() -> InstructionArgs:
         branch_flip=ValueWrapper(Bool, True),
         change_PC=ValueWrapper(Bool, True),
         just_stall=ValueWrapper(Bool, True),
-        write_back_from=ValueWrapper(Bits(WBF_LEN), False),
+        is_jalr=ValueWrapper(Bool, True),
     )
 
 
@@ -93,7 +84,7 @@ class Instruction:
     funct3: None | int
     funct7: None | int
 
-    alu_info: None | ALUInfo
+    alu_info: ALUInfo
 
     has_rd: bool
     has_rs1: bool
@@ -101,8 +92,6 @@ class Instruction:
     imm: None | Callable[[Value], Value]
 
     change_PC: bool
-
-    write_back_from: None | WriteBackFrom
 
     def matches(self, instruction: Value) -> Value:
         op_match = instruction[0:6] == Bits(7)(self.opcode)
@@ -112,10 +101,9 @@ class Instruction:
 
     def select_args(self, cond: Value, instruction: Value, args: InstructionArgs) -> InstructionArgs:
 
-        if self.alu_info is not None:
-            args.alu_op.select(cond, BITS_ALU(self.alu_info.alu_op.value))
-            args.operant1_from.select(cond, Bits(OF_LEN)(self.alu_info.operant1_from.value))
-            args.operant2_from.select(cond, Bits(OF_LEN)(self.alu_info.operant2_from.value))
+        args.alu_op.select(cond, BITS_ALU(self.alu_info.alu_op.value))
+        args.operant1_from.select(cond, Bits(OF_LEN)(self.alu_info.operant1_from.value))
+        args.operant2_from.select(cond, Bits(OF_LEN)(self.alu_info.operant2_from.value))
 
         if self.has_rd:
             args.rd.select(cond, instruction[7:11])
@@ -127,8 +115,6 @@ class Instruction:
             args.imm.select(cond, self.imm(instruction))
         if self.change_PC:
             args.change_PC.select(cond, Bool(1))
-        if self.write_back_from is not None:
-            args.write_back_from.select(cond, Bits(WBF_LEN)(self.write_back_from.value))
 
         return args
 
@@ -145,31 +131,33 @@ class RTypeInstruction(Instruction):
             has_rs2=True,
             imm=None,
             change_PC=False,
-            write_back_from=WriteBackFrom.OUT,
         )
 
 
 class ITypeInstruction(Instruction):
     memory_operation: None | MemoryOperation
     just_stall: bool
+    is_jalr: bool
 
     def __init__(
         self,
         opcode: int,
-        alu_op: None | RV32I_ALU,
+        alu_op: RV32I_ALU,
         funct3: int,
         funct7: None | int = None,
         change_PC: bool = False,
         memory_operation: None | MemoryOperation = None,
-        write_back_from: None | WriteBackFrom = WriteBackFrom.OUT,
         just_stall: bool = False,
+        operant1_from: OperantFrom = OperantFrom.RS1,
+        operant2_from: OperantFrom = OperantFrom.IMM,
+        is_jalr: bool = False,
     ):
         def imm_fn(instruction: Value) -> Value:
             return sext(instruction[20:31], Bits(32))
 
         super().__init__(
             opcode=opcode,
-            alu_info=ALUInfo(alu_op, OperantFrom.RS1, OperantFrom.IMM) if alu_op is not None else None,
+            alu_info=ALUInfo(alu_op, operant1_from, operant2_from),
             funct3=funct3,
             funct7=funct7,
             has_rd=True,
@@ -177,10 +165,10 @@ class ITypeInstruction(Instruction):
             has_rs2=False,
             imm=imm_fn,
             change_PC=change_PC,
-            write_back_from=write_back_from,
         )
         self.memory_operation = memory_operation
         self.just_stall = just_stall
+        self.is_jalr = is_jalr
 
     def select_args(self, cond: Value, instruction: Value, args: InstructionArgs) -> InstructionArgs:
         args = super().select_args(cond, instruction, args)
@@ -188,6 +176,8 @@ class ITypeInstruction(Instruction):
             args.memory_operation.select(cond, Bits(MO_LEN)(self.memory_operation.value))
         if self.just_stall:
             args.just_stall.select(cond, Bool(1))
+        if self.is_jalr:
+            args.is_jalr.select(cond, Bool(1))
         return args
 
 
@@ -210,7 +200,6 @@ class STypeInstruction(Instruction):
             has_rs2=True,
             imm=imm_fn,
             change_PC=False,
-            write_back_from=None,
         )
         self.memory_operation = memory_operation
 
@@ -241,7 +230,6 @@ class BTypeInstruction(Instruction):
             has_rs2=True,
             imm=imm_fn,
             change_PC=False,
-            write_back_from=None,
         )
         self.branch_flip = branch_flip
 
@@ -261,7 +249,6 @@ class UTypeInstruction(Instruction):
         alu_op: RV32I_ALU,
         operant1_from: OperantFrom,
         operant2_from: OperantFrom,
-        write_back_from: WriteBackFrom,
     ):
         def imm_fn(instruction: Value) -> Value:
             return instruction[12:31].concat(Bits(12)(0))
@@ -276,7 +263,6 @@ class UTypeInstruction(Instruction):
             has_rs2=False,
             imm=imm_fn,
             change_PC=False,
-            write_back_from=write_back_from,
         )
 
 
@@ -291,7 +277,7 @@ class JTypeInstruction(Instruction):
 
         super().__init__(
             opcode=opcode,
-            alu_info=ALUInfo(alu_op, OperantFrom.PC, OperantFrom.IMM),
+            alu_info=ALUInfo(alu_op, OperantFrom.PC, OperantFrom.LITERAL_FOUR),
             funct3=None,
             funct7=None,
             has_rd=True,
@@ -299,7 +285,6 @@ class JTypeInstruction(Instruction):
             has_rs2=False,
             imm=imm_fn,
             change_PC=True,
-            write_back_from=WriteBackFrom.INC_PC,
         )
 
 
@@ -330,35 +315,30 @@ class Instructions(Enum):
         alu_op=RV32I_ALU.ADD,
         funct3=0x0,
         memory_operation=MemoryOperation.LOAD_BYTE,
-        write_back_from=WriteBackFrom.OUT,
     )
     LH = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x1,
         memory_operation=MemoryOperation.LOAD_HALF,
-        write_back_from=WriteBackFrom.OUT,
     )
     LW = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x2,
         memory_operation=MemoryOperation.LOAD_WORD,
-        write_back_from=WriteBackFrom.OUT,
     )
     LBU = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x4,
         memory_operation=MemoryOperation.LOAD_BYTE,
-        write_back_from=WriteBackFrom.OUT,
     )
     LHU = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x5,
         memory_operation=MemoryOperation.LOAD_HALFU,
-        write_back_from=WriteBackFrom.OUT,
     )
 
     SB = STypeInstruction(
@@ -383,7 +363,13 @@ class Instructions(Enum):
 
     JAL = JTypeInstruction(opcode=0b1101111, alu_op=RV32I_ALU.ADD)
     JALR = ITypeInstruction(
-        opcode=0b1100111, funct3=0x0, alu_op=RV32I_ALU.ADD, change_PC=True, write_back_from=WriteBackFrom.INC_PC
+        opcode=0b1100111,
+        funct3=0x0,
+        alu_op=RV32I_ALU.ADD,
+        change_PC=True,
+        operant1_from=OperantFrom.PC,
+        operant2_from=OperantFrom.LITERAL_FOUR,
+        is_jalr=True,
     )
 
     LUI = UTypeInstruction(
@@ -391,14 +377,12 @@ class Instructions(Enum):
         alu_op=RV32I_ALU.OR,
         operant1_from=OperantFrom.IMM,
         operant2_from=OperantFrom.IMM,
-        write_back_from=WriteBackFrom.OUT,
     )
     AUIPC = UTypeInstruction(
         opcode=0b0010111,
         alu_op=RV32I_ALU.ADD,
         operant1_from=OperantFrom.PC,
         operant2_from=OperantFrom.IMM,
-        write_back_from=WriteBackFrom.OUT,
     )
 
-    EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD, write_back_from=None, just_stall=True)
+    EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD, just_stall=True)
