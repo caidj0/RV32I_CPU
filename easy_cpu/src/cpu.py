@@ -34,7 +34,7 @@ class CPU:
         self.fetcher_impl = FetcherImpl(verbose)
         self.decoder = Decoder(verbose)
         self.executor = Executor(verbose)
-        self.memory = Memory(verbose)
+        self.memory = Memory(verbose, self.dcache)
         self.write_back = WriteBack(verbose)
         self.reg_occupation = RegOccupation()
 
@@ -50,8 +50,8 @@ class CPU:
             self.icache, self.reg_file, self.reg_occupation, self.executor
         )
         self.executor.build(self.memory)
-        self.memory.build(self.dcache, self.write_back)
-        flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.dcache)
+        self.memory.build(self.write_back)
+        flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.memory)
 
         self.fetcher_impl.build(
             PC_reg, PC_addr, success_decode, should_stall, flush_PC, branch_offset, self.decoder, self.icache

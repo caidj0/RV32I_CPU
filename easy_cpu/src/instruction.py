@@ -35,10 +35,8 @@ OF_LEN = ceil(log2(len(OperantFrom)))
 
 
 class WriteBackFrom(Enum):
-    ALU = 0
-    MEM = 1
-    INC_PC = 2
-    IMM = 3
+    OUT = 0
+    INC_PC = 1
 
 
 WBF_LEN = ceil(log2(len(WriteBackFrom)))
@@ -147,7 +145,7 @@ class RTypeInstruction(Instruction):
             has_rs2=True,
             imm=None,
             change_PC=False,
-            write_back_from=WriteBackFrom.ALU,
+            write_back_from=WriteBackFrom.OUT,
         )
 
 
@@ -163,7 +161,7 @@ class ITypeInstruction(Instruction):
         funct7: None | int = None,
         change_PC: bool = False,
         memory_operation: None | MemoryOperation = None,
-        write_back_from: None | WriteBackFrom = WriteBackFrom.ALU,
+        write_back_from: None | WriteBackFrom = WriteBackFrom.OUT,
         just_stall: bool = False,
     ):
         def imm_fn(instruction: Value) -> Value:
@@ -257,13 +255,20 @@ class BTypeInstruction(Instruction):
 
 
 class UTypeInstruction(Instruction):
-    def __init__(self, opcode: int, alu_op: RV32I_ALU, write_back_from: WriteBackFrom):
+    def __init__(
+        self,
+        opcode: int,
+        alu_op: RV32I_ALU,
+        operant1_from: OperantFrom,
+        operant2_from: OperantFrom,
+        write_back_from: WriteBackFrom,
+    ):
         def imm_fn(instruction: Value) -> Value:
             return instruction[12:31].concat(Bits(12)(0))
 
         super().__init__(
             opcode=opcode,
-            alu_info=ALUInfo(alu_op, OperantFrom.PC, OperantFrom.IMM),
+            alu_info=ALUInfo(alu_op, operant1_from, operant2_from),
             funct3=None,
             funct7=None,
             has_rd=True,
@@ -325,35 +330,35 @@ class Instructions(Enum):
         alu_op=RV32I_ALU.ADD,
         funct3=0x0,
         memory_operation=MemoryOperation.LOAD_BYTE,
-        write_back_from=WriteBackFrom.MEM,
+        write_back_from=WriteBackFrom.OUT,
     )
     LH = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x1,
         memory_operation=MemoryOperation.LOAD_HALF,
-        write_back_from=WriteBackFrom.MEM,
+        write_back_from=WriteBackFrom.OUT,
     )
     LW = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x2,
         memory_operation=MemoryOperation.LOAD_WORD,
-        write_back_from=WriteBackFrom.MEM,
+        write_back_from=WriteBackFrom.OUT,
     )
     LBU = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x4,
         memory_operation=MemoryOperation.LOAD_BYTE,
-        write_back_from=WriteBackFrom.MEM,
+        write_back_from=WriteBackFrom.OUT,
     )
     LHU = ITypeInstruction(
         opcode=0b0000011,
         alu_op=RV32I_ALU.ADD,
         funct3=0x5,
         memory_operation=MemoryOperation.LOAD_HALFU,
-        write_back_from=WriteBackFrom.MEM,
+        write_back_from=WriteBackFrom.OUT,
     )
 
     SB = STypeInstruction(
@@ -381,7 +386,19 @@ class Instructions(Enum):
         opcode=0b1100111, funct3=0x0, alu_op=RV32I_ALU.ADD, change_PC=True, write_back_from=WriteBackFrom.INC_PC
     )
 
-    LUI = UTypeInstruction(opcode=0b0110111, alu_op=RV32I_ALU.ADD, write_back_from=WriteBackFrom.IMM)
-    AUIPC = UTypeInstruction(opcode=0b0010111, alu_op=RV32I_ALU.ADD, write_back_from=WriteBackFrom.ALU)
+    LUI = UTypeInstruction(
+        opcode=0b0110111,
+        alu_op=RV32I_ALU.OR,
+        operant1_from=OperantFrom.IMM,
+        operant2_from=OperantFrom.IMM,
+        write_back_from=WriteBackFrom.OUT,
+    )
+    AUIPC = UTypeInstruction(
+        opcode=0b0010111,
+        alu_op=RV32I_ALU.ADD,
+        operant1_from=OperantFrom.PC,
+        operant2_from=OperantFrom.IMM,
+        write_back_from=WriteBackFrom.OUT,
+    )
 
     EBREAK = ITypeInstruction(opcode=0b1110011, funct3=0x0, alu_op=RV32I_ALU.ADD, write_back_from=None, just_stall=True)

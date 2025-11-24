@@ -8,16 +8,16 @@ from cpu import CPU
 def main():
     sys = SysBuilder("easy_cpu")
     with sys:
-        _ = CPU("asms/quick_sort/quick_sort.hex", verbose=False)
+        _ = CPU("asms/empty/empty.hex", verbose=True)
     sim, ver = elaborate(
         sys,
         verilog=True,
         verbose=False,
-        sim_threshold=1000000,
+        sim_threshold=100,
         resource_base=os.getcwd(),
     )
     raw = run_simulator(sim)
-    with open("out/quick_sort.out", "w") as f:
+    with open("out/empty.out", "w") as f:
         f.write(raw)
 
 

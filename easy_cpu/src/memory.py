@@ -1,7 +1,7 @@
 from assassyn.frontend import *
 from instruction import MO_LEN, WBF_LEN, MemoryOperation
 from reg_file import RegFile
-from utils import Bool, forward_ports, peek_or
+from utils import Bool, forward_ports, peek_or, pop_or
 
 
 class Memory(Module):
@@ -19,7 +19,11 @@ class Memory(Module):
     write_back_from: Port
     alu_result: Port
 
-    def __init__(self, verbose: bool):
+    alu_out: Array
+    is_memory_out: Array
+    dcache: SRAM
+
+    def __init__(self, verbose: bool, dcache: SRAM):
         super().__init__(
             ports={
                 "instruction_addr": Port(Bits(32)),
@@ -36,15 +40,19 @@ class Memory(Module):
             }
         )
         self.verbose = verbose
+        self.alu_out = RegArray(Bits(32), 1)
+        self.is_memory_out = RegArray(Bool, 1)
+        self.dcache = dcache
 
     @module.combinational
-    def build(self, dcache: SRAM, write_back: Module):
+    def build(self, write_back: Module):
         need_mem = self.memory_operation.valid()
 
-        memory_operation = peek_or(self.memory_operation, Bits(MO_LEN)(0))
-        alu_result = self.alu_result.peek()
+        memory_operation = pop_or(self.memory_operation, Bits(MO_LEN)(0))
+        alu_result = self.alu_result.pop()
         addr = need_mem.select(alu_result, Bits(32)(0))
-        raw_wdata = peek_or(self.rs2, Bits(32)(0))
+        pop_or(self.rs1, Bits(32)(0))
+        raw_wdata = pop_or(self.rs2, Bits(32)(0))
 
         raw_re = memory_operation <= Bits(MO_LEN)(MemoryOperation.LOAD_HALFU.value)
         re = need_mem & raw_re
@@ -59,7 +67,10 @@ class Memory(Module):
         )
 
         # 注意 sram 一个地址对应一个字，从而地址需要截断
-        dcache.build(we, re, addr[2:31].zext(Bits(32)), wdata)
+        self.dcache.build(we, re, addr[2:31].zext(Bits(32)), wdata)
+
+        self.is_memory_out[0] = need_mem
+        self.alu_out[0] = alu_result
 
         if self.verbose:
             log("we: {}, re: {}, addr: 0x{:08X}, wdata: 0x{:08X}", we, re, addr, wdata)
@@ -69,16 +80,16 @@ class Memory(Module):
             [
                 self.instruction_addr,
                 self.rd,
-                self.rs1,
-                self.rs2,
                 self.imm,
-                self.memory_operation,
                 self.is_branch,
                 self.branch_flip,
                 self.change_PC,
                 self.write_back_from,
-                self.alu_result,
             ],
         )
 
         write_back.async_called()
+
+    def get_out(self) -> Value:
+        # TODO: 添加字节、半字支持
+        return self.is_memory_out[0].select(self.dcache.dout[0], self.alu_out[0])
