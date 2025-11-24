@@ -1,4 +1,5 @@
 from assassyn.frontend import *
+from bypass import Bypasser
 from clocker import Driver
 from decoder import Decoder
 from executor import Executor
@@ -22,6 +23,7 @@ class CPU:
     executor: Executor
     memory: Memory
     write_back: WriteBack
+    bypasser: Bypasser
 
     clocker: Driver
 
@@ -37,6 +39,7 @@ class CPU:
         self.memory = Memory(verbose, self.dcache)
         self.write_back = WriteBack(verbose)
         self.reg_occupation = RegOccupation()
+        self.bypasser = Bypasser(verbose)
 
         self.clocker = Driver()
 
@@ -46,14 +49,15 @@ class CPU:
         self.clocker.build([self.fetcher, self.decoder])
 
         PC_reg, PC_addr = self.fetcher.build()
-        success_decode, occupied_rd, should_stall = self.decoder.build(
-            self.icache, self.reg_file, self.reg_occupation, self.executor
+        success_decode, occupied_rd, should_stall, decoder_rd = self.decoder.build(
+            self.icache, self.reg_file, self.reg_occupation, self.executor, self.memory, self.bypasser
         )
-        self.executor.build(self.memory)
-        self.memory.build(self.write_back)
+        alu_rd = self.executor.build(self.memory)
+        mem_rd = self.memory.build(self.write_back)
         flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.memory)
 
         self.fetcher_impl.build(
             PC_reg, PC_addr, success_decode, should_stall, flush_PC, branch_offset, self.decoder, self.icache
         )
         self.reg_occupation.build(occupied_rd, release_rd)
+        self.bypasser.build(PC_addr, decoder_rd, alu_rd, mem_rd)

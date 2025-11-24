@@ -74,6 +74,8 @@ class Memory(Module):
         if self.verbose:
             log("we: {}, re: {}, addr: 0x{:08X}, wdata: 0x{:08X}", we, re, addr, wdata)
 
+        rd = peek_or(self.rd, Bits(5)(0))
+
         forward_ports(
             write_back,
             [
@@ -89,6 +91,8 @@ class Memory(Module):
         )
 
         write_back.async_called()
+
+        return rd
 
     def get_out(self) -> Value:
         # TODO: 添加字节、半字支持

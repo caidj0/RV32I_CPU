@@ -80,6 +80,9 @@ class Executor(Module):
                 rs2,
             )
 
+        with Condition(~self.memory_operation.valid()):
+            rd = peek_or(self.rd, Bits(5)(0))
+
         forward_ports(
             memory,
             [
@@ -97,6 +100,8 @@ class Executor(Module):
         )
 
         memory.async_called()
+
+        return rd
 
     def get_out(self) -> Value:
         return self.alu_out[0]
