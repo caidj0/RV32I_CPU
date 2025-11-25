@@ -1,9 +1,15 @@
+from typing import Callable
 from assassyn.frontend import *
 from bypass import Bypasser
 from clocker import Driver
 from decoder import Decoder
 from executor import Executor
 from memory import Memory
+from predictor import (
+    AlwaysBranchPredictor,
+    PredictFeedback,
+    Predictor,
+)
 from reg_file import RegFile, RegOccupation
 from fetcher import Fetcher, FetcherImpl
 from utils import Bool
@@ -24,10 +30,17 @@ class CPU:
     memory: Memory
     write_back: WriteBack
     bypasser: Bypasser
+    predictor: Predictor
 
     clocker: Driver
 
-    def __init__(self, sram_file: str | None, verbose: bool = False):
+    @staticmethod
+    def default_predictor():
+        return AlwaysBranchPredictor()
+
+    def __init__(
+        self, sram_file: str | None, predictor_fn: Callable[[], Predictor] = default_predictor, verbose: bool = False
+    ):
         self.reg_file = RegFile()
         self.icache = SRAM(32, 0x100000, sram_file)
         self.dcache = SRAM(32, 0x100000, sram_file)
@@ -38,8 +51,9 @@ class CPU:
         self.executor = Executor(verbose)
         self.memory = Memory(verbose, self.dcache)
         self.write_back = WriteBack(verbose)
-        self.reg_occupation = RegOccupation()
+        self.reg_occupation = RegOccupation(verbose)
         self.bypasser = Bypasser(verbose)
+        self.predictor = predictor_fn()
 
         self.clocker = Driver()
 
@@ -49,15 +63,26 @@ class CPU:
         self.clocker.build([self.fetcher, self.decoder])
 
         PC_reg, PC_addr = self.fetcher.build()
-        success_decode, occupied_rd, should_stall, decoder_rd = self.decoder.build(
+        should_stall, decoder_rd, branch_addr, predict_offset = self.decoder.build(
             self.icache, self.reg_file, self.reg_occupation, self.executor, self.memory, self.bypasser
         )
-        alu_rd = self.executor.build(self.memory)
+        flush_PC, flush_offset, alu_rd = self.executor.build(self.memory, self.bypasser)
         mem_rd = self.memory.build(self.write_back)
-        flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.memory)
+        release_rd = self.write_back.build(self.reg_file, self.memory)
 
-        self.fetcher_impl.build(
-            PC_reg, PC_addr, success_decode, should_stall, flush_PC, branch_offset, self.decoder, self.icache
+        self.reg_occupation.build(decoder_rd, release_rd, flush_PC)
+        self.bypasser.build(PC_addr, decoder_rd, alu_rd, mem_rd, flush_PC)
+        branch_predict = self.predictor.build(
+            branch_addr, PredictFeedback(Bits(32)(0), Bool(0), Bool(0)), self.executor
         )
-        self.reg_occupation.build(occupied_rd, release_rd)
-        self.bypasser.build(PC_addr, decoder_rd, alu_rd, mem_rd)
+        self.fetcher_impl.build(
+            PC_reg,
+            PC_addr,
+            should_stall,
+            flush_PC,
+            flush_offset,
+            branch_predict,
+            predict_offset,
+            self.decoder,
+            self.icache,
+        )

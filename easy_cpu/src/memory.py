@@ -10,13 +10,8 @@ class Memory(Module):
     rd: Port
     rs1: Port
     rs2: Port
-    imm: Port
     memory_operation: Port
-    is_branch: Port
-    branch_flip: Port
-    change_PC: Port
     alu_result: Port
-    is_jalr: Port
 
     alu_out: Array
     is_memory_out: Array
@@ -29,13 +24,8 @@ class Memory(Module):
                 "rd": Port(Bits(5)),
                 "rs1": Port(Bits(32)),
                 "rs2": Port(Bits(32)),
-                "imm": Port(Bits(32)),
                 "memory_operation": Port(Bits(MO_LEN)),
-                "is_branch": Port(Bool),
-                "branch_flip": Port(Bool),
-                "change_PC": Port(Bool),
                 "alu_result": Port(Bits(32)),
-                "is_jalr": Port(Bool),
             }
         )
         self.verbose = verbose
@@ -50,7 +40,7 @@ class Memory(Module):
         memory_operation = pop_or(self.memory_operation, Bits(MO_LEN)(0))
         alu_result = self.alu_result.pop()
         addr = need_mem.select(alu_result, Bits(32)(0))
-        peek_or(self.rs1, Bits(32)(0))
+        pop_or(self.rs1, Bits(32)(0))
         raw_wdata = pop_or(self.rs2, Bits(32)(0))
 
         raw_re = memory_operation <= Bits(MO_LEN)(MemoryOperation.LOAD_HALFU.value)
@@ -81,12 +71,6 @@ class Memory(Module):
             [
                 self.instruction_addr,
                 self.rd,
-                self.rs1,
-                self.imm,
-                self.is_branch,
-                self.branch_flip,
-                self.change_PC,
-                self.is_jalr,
             ],
         )
 

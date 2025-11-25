@@ -26,7 +26,7 @@ class Decoder(Module):
         memory: Memory,
         bypasser: Bypasser,
     ):
-        instruction_addr = self.pop_all_ports(validate=True)
+        instruction_addr: Value = self.pop_all_ports(validate=True)  # pyright: ignore[reportAssignmentType]
         instruction = icache.dout[0]
 
         args = default_instruction_arguments()
@@ -38,17 +38,16 @@ class Decoder(Module):
             inst.value.select_args(inst_cond, instruction, args)
             matched |= inst_cond
 
-        # assume(matched)
-
-        # 常量不能检查 valid，因此需要一个 operator
-        success_decode = Bool(0) | Bool(1)
+        assume(matched)
 
         def is_rs_valid(rs: Value):
             return (reg_occupation[rs] == UInt(2)(0)) | (
                 (rs != bypasser.decoder_rd[0]) & ((rs == bypasser.alu_rd[0]) | (rs == bypasser.mem_rd[0]))
             )
 
-        wait_until(is_rs_valid(args.rs1.value) & is_rs_valid(args.rs2.value))
+        is_rs1_valid = is_rs_valid(args.rs1.value)
+        is_rs2_valid = is_rs_valid(args.rs2.value)
+        wait_until(is_rs1_valid & is_rs2_valid)
 
         def rs_selector(rs: Value):
             is_x0 = rs == Bits(5)(0)
@@ -72,7 +71,11 @@ class Decoder(Module):
         args.bind_with(executor, ["rs1", "rs2", "just_stall"])
         executor.async_called(instruction_addr=instruction_addr)
 
-        should_stall = args.is_branch.value | args.change_PC.value | args.just_stall.value
+        should_stall = args.change_PC.value | args.just_stall.value
+
+        with Condition(args.is_branch.value):
+            branch_addr = instruction_addr & instruction_addr
+            predict_offset = args.imm.value & args.imm.value
 
         if self.verbose:
             log(
@@ -89,4 +92,4 @@ class Decoder(Module):
                 rs2_data,
             )
 
-        return success_decode, args.rd.value, should_stall, args.rd.value
+        return should_stall, args.rd.value, branch_addr, predict_offset

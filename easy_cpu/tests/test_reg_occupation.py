@@ -110,9 +110,9 @@ def test_reg_occupation():
     sys = SysBuilder("reg_occupation_test")
     with sys:
         driver = Driver()
-        reg_occupation = RegOccupation()
+        reg_occupation = RegOccupation(verbose=False)
         occupy_reg, release_reg = driver.build(reg_occupation)
-        reg_occupation.build(occupy_reg, release_reg)
+        reg_occupation.build(occupy_reg, release_reg, None)
 
     sim, _ = elaborate(sys, verbose=False, sim_threshold=len(Instructions) + 1)
 
