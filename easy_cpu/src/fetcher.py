@@ -31,15 +31,14 @@ class FetcherImpl(Downstream):
         self,
         PC_reg: Array,
         PC_addr: Value,
-        success_decode: Value,
         should_stall: Value,
         flush_PC: Value,
         branch_offset: Value,
         decoder: Decoder,
         icache: SRAM,
     ):
+        success_decode = should_stall.valid()
         should_stall = should_stall.optional(Bool(0))
-        success_decode = success_decode.optional(Bool(0))
 
         cancel_stall = flush_PC.valid() | branch_offset.valid()
 

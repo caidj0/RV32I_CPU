@@ -40,9 +40,6 @@ class Decoder(Module):
 
         # assume(matched)
 
-        # 常量不能检查 valid，因此需要一个 operator
-        success_decode = Bool(0) | Bool(1)
-
         def is_rs_valid(rs: Value):
             return (reg_occupation[rs] == UInt(2)(0)) | (
                 (rs != bypasser.decoder_rd[0]) & ((rs == bypasser.alu_rd[0]) | (rs == bypasser.mem_rd[0]))
@@ -89,4 +86,4 @@ class Decoder(Module):
                 rs2_data,
             )
 
-        return success_decode, args.rd.value, should_stall, args.rd.value
+        return should_stall, args.rd.value

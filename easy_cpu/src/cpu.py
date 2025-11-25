@@ -49,15 +49,13 @@ class CPU:
         self.clocker.build([self.fetcher, self.decoder])
 
         PC_reg, PC_addr = self.fetcher.build()
-        success_decode, occupied_rd, should_stall, decoder_rd = self.decoder.build(
+        should_stall, decoder_rd = self.decoder.build(
             self.icache, self.reg_file, self.reg_occupation, self.executor, self.memory, self.bypasser
         )
         alu_rd = self.executor.build(self.memory)
         mem_rd = self.memory.build(self.write_back)
         flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.memory)
 
-        self.fetcher_impl.build(
-            PC_reg, PC_addr, success_decode, should_stall, flush_PC, branch_offset, self.decoder, self.icache
-        )
-        self.reg_occupation.build(occupied_rd, release_rd)
+        self.fetcher_impl.build(PC_reg, PC_addr, should_stall, flush_PC, branch_offset, self.decoder, self.icache)
+        self.reg_occupation.build(decoder_rd, release_rd)
         self.bypasser.build(PC_addr, decoder_rd, alu_rd, mem_rd)
