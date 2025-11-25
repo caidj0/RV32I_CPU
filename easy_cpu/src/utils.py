@@ -62,6 +62,13 @@ def forward_ports(receiver: Module | Bind, ports: list[Port]):
             receiver.bind(**{name: port.pop()})
 
 
+def flush_all_ports(module: Module):
+    for item in module.__dict__.values():
+        if isinstance(item, Port):
+            with Condition(item.valid()):
+                item.pop()
+
+
 def to_one_hot(value: Value, select_number: int) -> Value:
     return Bits(select_number)(1) << value
 

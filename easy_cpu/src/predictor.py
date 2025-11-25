@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from assassyn.frontend import *
 from assassyn.frontend import Value
+from executor import Executor
 from utils import Bool
 
 
@@ -17,25 +18,42 @@ class Predictor(Downstream, ABC):
         super().__init__()
 
     @abstractmethod
-    def build(self, branch_addr: Value, feed_back: PredictFeedback) -> Value:
+    def build_predict(self, branch_addr: Value) -> Value:
         pass
+
+    @abstractmethod
+    def build_feedback(self, feed_back: PredictFeedback):
+        pass
+
+    @downstream.combinational
+    def build(self, branch_addr: Value, feed_back: PredictFeedback, executor: Executor) -> Value:
+        self.build_feedback(feed_back)
+
+        is_valid = branch_addr.valid()
+        with Condition(is_valid):
+            branch_predict = self.build_predict(branch_addr)
+            branch_predict = branch_predict | branch_predict
+            executor.bind(branch_predict=branch_predict)
+        return branch_predict
 
 
 class AlwaysBranchPredictor(Predictor):
     def __init__(self):
         super().__init__()
 
-    @downstream.combinational
-    def build(self, branch_addr: Value, feed_back: PredictFeedback) -> Value:
-        with Condition(branch_addr.valid()):
-            return Bool(1) | Bool(1)
+    def build_predict(self, branch_addr: Value) -> Value:
+        return Bool(1)
+
+    def build_feedback(self, feed_back: PredictFeedback):
+        pass
 
 
 class NeverBranchPredictor(Predictor):
     def __init__(self):
         super().__init__()
 
-    @downstream.combinational
-    def build(self, branch_addr: Value, feed_back: PredictFeedback) -> Value:
-        with Condition(branch_addr.valid()):
-            return Bool(0) | Bool(0)
+    def build_predict(self, branch_addr: Value) -> Value:
+        return Bool(0)
+
+    def build_feedback(self, feed_back: PredictFeedback):
+        pass

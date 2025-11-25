@@ -3,16 +3,20 @@ from utils import Bool
 
 
 class RegOccupation(Downstream):
+    verbose: bool
+
     occupies: list[Array]
 
-    def __init__(self):
+    def __init__(self, verbose: bool):
         super().__init__()
+
+        self.verbose = verbose
 
         self.occupies = [RegArray(UInt(2), 1) for _ in range(32)]
 
     @downstream.combinational
-    def build(self, occupy_reg: Value, release_reg: Value):
-        occupy_reg = occupy_reg.optional(Bits(5)(0))
+    def build(self, occupy_reg: Value, release_reg: Value, flush_flag: Value):
+        occupy_reg = flush_flag.valid().select(Bits(5)(0), occupy_reg.optional(Bits(5)(0)))
         release_reg = release_reg.optional(Bits(5)(0))
 
         with Condition(occupy_reg != release_reg):
@@ -22,6 +26,20 @@ class RegOccupation(Downstream):
                     self.occupies[index][0] += UInt(2)(1)
                 with Condition(release_reg == index_value):
                     self.occupies[index][0] -= UInt(2)(1)
+
+        if self.verbose:
+            log_parts = ["occupy: {}, release: {},"]
+            for i in range(32):
+                log_parts.append(f"x{i}={{}}")
+            log_format = " ".join(log_parts)
+            new_regs = [
+                (occupy_reg == Bits(5)(i)).select(
+                    (release_reg == Bits(5)(i)).select(self.occupies[i][0], self.occupies[i][0] + UInt(2)(1)),
+                    (release_reg == Bits(5)(i)).select(self.occupies[i][0] - UInt(2)(1), self.occupies[i][0]),
+                )
+                for i in range(32)
+            ]
+            log(log_format, occupy_reg, release_reg, *new_regs)
 
     def __getitem__(self, index: Value) -> Value:
         d = {Bits(5)(i): self.occupies[i][0] for i in range(0, 32)}
