@@ -5,6 +5,7 @@ import os
 from typing import Callable, Any
 from assassyn.frontend import *
 from assassyn.ir.expr.call import Bind
+from assassyn.ir.const import Const
 
 Bool = Bits(1)
 
@@ -71,6 +72,14 @@ def flush_all_ports(module: Module):
 
 def to_one_hot(value: Value, select_number: int) -> Value:
     return Bits(select_number)(1) << value
+
+
+def check_valid(value: Value) -> Value:
+    if isinstance(value, Expr):
+        return value.valid()
+    if isinstance(value, Const):
+        return Bool(1)
+    assert False
 
 
 def run_quietly(func: Callable[[Any], Any], *args, **kwargs) -> tuple[Any | None, str, str]:

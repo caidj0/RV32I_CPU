@@ -1,10 +1,15 @@
+from typing import Callable
 from assassyn.frontend import *
 from bypass import Bypasser
 from clocker import Driver
 from decoder import Decoder
 from executor import Executor
 from memory import Memory
-from predictor import AlwaysBranchPredictor, PredictFeedback, Predictor
+from predictor import (
+    AlwaysBranchPredictor,
+    PredictFeedback,
+    Predictor,
+)
 from reg_file import RegFile, RegOccupation
 from fetcher import Fetcher, FetcherImpl
 from utils import Bool
@@ -29,8 +34,12 @@ class CPU:
 
     clocker: Driver
 
+    @staticmethod
+    def default_predictor():
+        return AlwaysBranchPredictor()
+
     def __init__(
-        self, sram_file: str | None, predictor_cls: type[Predictor] = AlwaysBranchPredictor, verbose: bool = False
+        self, sram_file: str | None, predictor_fn: Callable[[], Predictor] = default_predictor, verbose: bool = False
     ):
         self.reg_file = RegFile()
         self.icache = SRAM(32, 0x100000, sram_file)
@@ -44,7 +53,7 @@ class CPU:
         self.write_back = WriteBack(verbose)
         self.reg_occupation = RegOccupation(verbose)
         self.bypasser = Bypasser(verbose)
-        self.predictor = predictor_cls()
+        self.predictor = predictor_fn()
 
         self.clocker = Driver()
 

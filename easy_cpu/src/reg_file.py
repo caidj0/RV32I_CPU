@@ -15,8 +15,14 @@ class RegOccupation(Downstream):
         self.occupies = [RegArray(UInt(2), 1) for _ in range(32)]
 
     @downstream.combinational
-    def build(self, occupy_reg: Value, release_reg: Value, flush_flag: Value):
-        occupy_reg = flush_flag.valid().select(Bits(5)(0), occupy_reg.optional(Bits(5)(0)))
+    def build(self, occupy_reg: Value, release_reg: Value, flush_flag: Value | None):
+        flush: Value
+        if flush_flag:
+            flush = flush_flag.valid()
+        else:
+            flush = Bool(0)
+
+        occupy_reg = flush.select(Bits(5)(0), occupy_reg.optional(Bits(5)(0)))
         release_reg = release_reg.optional(Bits(5)(0))
 
         with Condition(occupy_reg != release_reg):

@@ -45,8 +45,6 @@ class FetcherImpl(Downstream):
 
         cancel_stall = flush_PC.valid() | flush_offset.valid()
 
-        assume(~(cancel_stall & should_stall))
-
         added_PC = flush_PC.optional(PC_addr) + flush_offset.optional(should_branch.select(predict_offset, Bits(32)(4)))
 
         new_stalled = (self.stalled[0] | should_stall) & ~cancel_stall

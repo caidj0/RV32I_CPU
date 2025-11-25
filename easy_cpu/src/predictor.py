@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from assassyn.frontend import *
 from assassyn.frontend import Value
 from executor import Executor
@@ -57,3 +58,47 @@ class NeverBranchPredictor(Predictor):
 
     def build_feedback(self, feed_back: PredictFeedback):
         pass
+
+
+class BinaryPredictState(Enum):
+    StronglyB = 0
+    WeaklyB = 1
+    WeaklyNo = 2
+    StronglyNo = 3
+
+
+class BinaryPredictor(Predictor):
+    bits: int
+
+    states: Array
+
+    def __init__(self, bits: int, init_state: BinaryPredictState):
+        super().__init__()
+
+        assert bits > 0
+        self.bits = bits
+        size = 1 << bits
+        self.states = RegArray(Bits(2), size, [init_state.value] * size)
+
+    def build_predict(self, branch_addr: Value) -> Value:
+        state = self.states[self.extract_branch_bits(branch_addr)]
+
+        return (state == Bits(2)(BinaryPredictState.StronglyB.value)) | (
+            state == Bits(2)(BinaryPredictState.WeaklyB.value)
+        )
+
+    def extract_branch_bits(self, branch_addr):
+        return branch_addr[0 : (self.bits - 1)]
+
+    def build_feedback(self, feed_back: PredictFeedback):
+        addr = feed_back.addr
+        actual_branch = feed_back.actual_branch
+
+        branch_bits = self.extract_branch_bits(addr)
+        state = self.states[branch_bits]
+
+        new_state = actual_branch.select(
+            (state == Bits(2)(0)).select(state, state - Bits(2)(1)),
+            ((state == Bits(2)(3)).select(state, state + Bits(2)(1))),
+        )
+        self.states[branch_bits] = new_state

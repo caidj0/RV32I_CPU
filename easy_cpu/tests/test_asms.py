@@ -7,10 +7,15 @@ from assassyn.backend import elaborate
 from assassyn.utils import run_simulator
 
 from cpu import CPU
+from predictor import BinaryPredictState, BinaryPredictor
 from utils import run_quietly
 
 test_cases_path = "asms"
 work_path = "tmp"
+
+
+def get_predictor():
+    return BinaryPredictor(5, BinaryPredictState.WeaklyB)
 
 
 def test_asms():
@@ -19,7 +24,7 @@ def test_asms():
     os.makedirs(work_path, exist_ok=True)
     sys = SysBuilder("easy_cpu")
     with sys:
-        _ = CPU(work_hex_path, verbose=False)
+        _ = CPU(work_hex_path, get_predictor, verbose=False)
     sim, _ = elaborate(sys, verbose=False, sim_threshold=1000000, resource_base=os.getcwd())
 
     test_cases = os.listdir(test_cases_path)
