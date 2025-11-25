@@ -210,25 +210,29 @@ class STypeInstruction(Instruction):
 
 
 class BTypeInstruction(Instruction):
+    OPCODE = 0b1100011
+
     branch_flip: bool
 
-    def __init__(self, opcode: int, alu_op: RV32I_ALU, funct3: int, branch_flip: bool = False):
-        def imm_fn(instruction: Value) -> Value:
-            imm_11 = instruction[7:7]
-            imm_4_1 = instruction[8:11]
-            imm_10_5 = instruction[25:30]
-            imm_12 = instruction[31:31]
-            return sext(imm_12.concat(imm_11).concat(imm_10_5).concat(imm_4_1).concat(Bits(1)(0)), Bits(32))
+    @staticmethod
+    def imm_fn(instruction: Value) -> Value:
+        imm_11 = instruction[7:7]
+        imm_4_1 = instruction[8:11]
+        imm_10_5 = instruction[25:30]
+        imm_12 = instruction[31:31]
+        return sext(imm_12.concat(imm_11).concat(imm_10_5).concat(imm_4_1).concat(Bits(1)(0)), Bits(32))
+
+    def __init__(self, alu_op: RV32I_ALU, funct3: int, branch_flip: bool = False):
 
         super().__init__(
-            opcode=opcode,
+            opcode=self.OPCODE,
             alu_info=ALUInfo(alu_op, OperantFrom.RS1, OperantFrom.RS2),
             funct3=funct3,
             funct7=None,
             has_rd=False,
             has_rs1=True,
             has_rs2=True,
-            imm=imm_fn,
+            imm=self.imm_fn,
             change_PC=False,
         )
         self.branch_flip = branch_flip
@@ -352,14 +356,14 @@ class Instructions(Enum):
     )
 
     # alu 结果非零跳转，全零不跳转
-    BNE = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SUB, funct3=0x1)
-    BLT = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SLT, funct3=0x4)
-    BLTU = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SLTU, funct3=0x6)
+    BNE = BTypeInstruction(alu_op=RV32I_ALU.SUB, funct3=0x1)
+    BLT = BTypeInstruction(alu_op=RV32I_ALU.SLT, funct3=0x4)
+    BLTU = BTypeInstruction(alu_op=RV32I_ALU.SLTU, funct3=0x6)
 
     # alu 结果全零跳转，非零不跳转
-    BEQ = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SUB, funct3=0x0, branch_flip=True)
-    BGE = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SLT, funct3=0x5, branch_flip=True)
-    BGEU = BTypeInstruction(opcode=0b1100011, alu_op=RV32I_ALU.SLTU, funct3=0x7, branch_flip=True)
+    BEQ = BTypeInstruction(alu_op=RV32I_ALU.SUB, funct3=0x0, branch_flip=True)
+    BGE = BTypeInstruction(alu_op=RV32I_ALU.SLT, funct3=0x5, branch_flip=True)
+    BGEU = BTypeInstruction(alu_op=RV32I_ALU.SLTU, funct3=0x7, branch_flip=True)
 
     JAL = JTypeInstruction(opcode=0b1101111, alu_op=RV32I_ALU.ADD)
     JALR = ITypeInstruction(
