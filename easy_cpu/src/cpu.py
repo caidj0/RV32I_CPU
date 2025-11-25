@@ -52,9 +52,9 @@ class CPU:
         should_stall, decoder_rd = self.decoder.build(
             self.icache, self.reg_file, self.reg_occupation, self.executor, self.memory, self.bypasser
         )
-        alu_rd = self.executor.build(self.memory)
+        flush_PC, branch_offset, alu_rd = self.executor.build(self.memory)
         mem_rd = self.memory.build(self.write_back)
-        flush_PC, branch_offset, release_rd = self.write_back.build(self.reg_file, self.memory)
+        release_rd = self.write_back.build(self.reg_file, self.memory)
 
         self.fetcher_impl.build(PC_reg, PC_addr, should_stall, flush_PC, branch_offset, self.decoder, self.icache)
         self.reg_occupation.build(decoder_rd, release_rd)
